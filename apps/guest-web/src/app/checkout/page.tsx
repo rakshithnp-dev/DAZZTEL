@@ -1,515 +1,439 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const holdIdFromQuery = searchParams.get('holdId');
 
-  // Checkout Screens: 1 (Stay Selection) -> 2 (Guest Info) -> 3 (Review & Offers) -> 4 (Payment) -> 5 (Confirmation)
-  const [screen, setScreen] = useState<1 | 2 | 3 | 4 | 5>(1);
+  // Step state (1 to 5)
+  // 1: Addons, 2: Rider details, 3: Review & 12% GST, 4: UPI payment, 5: Confirmed Voucher
+  const [step, setStep] = useState(2); // Start at rider details since addons picked on home
 
-  // Hold details
-  const [hold, setHold] = useState<any>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(600); // 10 minutes
+  // Hold Timer (10 minutes countdown)
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(582);
 
-  // Guest details (Screen 2)
-  const [fullName, setFullName] = useState('Arjun Nambiar');
-  const [email, setEmail] = useState('rider.arjun@gmail.com');
-  const [phone, setPhone] = useState('+919988776655');
-  const [nationality, setNationality] = useState('IN');
-  const [bikeModel, setBikeModel] = useState('Royal Enfield Himalayan 450');
-  const [bikeRegNumber, setBikeRegNumber] = useState('GA-03-AB-4021');
-
-  // Coupon & Offers (Screen 3)
-  const [couponCode, setCouponCode] = useState('MOTOEXPLORE10');
-  const [discountPaise, setDiscountPaise] = useState(0);
-  const [couponApplied, setCouponApplied] = useState(false);
-
-  // Payment (Screen 4)
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'NET_BANKING'>('UPI');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Confirmation result (Screen 5)
-  const [confirmation, setConfirmation] = useState<any>(null);
-
-  // Load hold on mount
   useEffect(() => {
-    const cachedHold = sessionStorage.getItem('currentHold');
-    if (cachedHold) {
-      const parsed = JSON.parse(cachedHold);
-      setHold(parsed);
-      const expiresAt = new Date(parsed.expiresAt).getTime();
-      const diff = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
-      setRemainingSeconds(diff);
-    }
+    const timer = setInterval(() => {
+      setTimeLeftSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  // 10-minute hold countdown timer
-  useEffect(() => {
-    if (screen === 5) return;
-    const interval = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          alert('Your 10-minute hold has expired. The beds have been released back to general availability.');
-          router.push('/');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [screen, router]);
-
-  const applyCoupon = () => {
-    if (!couponCode) return;
-    if (couponCode.toUpperCase() === 'MOTOEXPLORE10') {
-      const discount = Math.round((hold.pricing.accommodationPaise * 10) / 100);
-      setDiscountPaise(discount);
-      setCouponApplied(true);
-    } else {
-      alert('Invalid or expired coupon code');
-    }
+  const formatTimer = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleFinalPayment = async () => {
-    setLoading(true);
-    setError(null);
+  // Form Fields
+  const [guestName, setGuestName] = useState('Arjun Singhania');
+  const [phone, setPhone] = useState('9823048291');
+  const [email, setEmail] = useState('arjun.rides@nomad.in');
+  const [bloodGroup, setBloodGroup] = useState('O+ve');
+  const [emergencyName, setEmergencyName] = useState('Ravi Singhania (Brother)');
+  const [emergencyPhone, setEmergencyPhone] = useState('9821098765');
+  const [vehicleModel, setVehicleModel] = useState('Royal Enfield Himalayan 450');
+  const [vehiclePlate, setVehiclePlate] = useState('MH 12 QX 4040');
 
-    try {
-      const res = await fetch('/api/v1/bookings/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          holdId: hold.holdId,
-          guest: {
-            fullName,
-            email,
-            phone,
-            nationality,
-            bikeModel,
-            bikeRegNumber,
-          },
-          couponCode: couponApplied ? couponCode : undefined,
-          paymentMethod,
-          idempotencyKey: `idemp-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        }),
-      });
+  // Coupon
+  const [couponCode, setCouponCode] = useState('RIDEGOA');
+  const [couponApplied, setCouponApplied] = useState(true);
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || 'Payment processing failed');
-      }
+  // Financial calculations in INR
+  const nights = 3;
+  const baseDorm = 849 * nights; // 2547
+  const bikeParking = 150 * nights; // 450
+  const gearLocker = 100 * nights; // 300
+  const subtotal = baseDorm + bikeParking + gearLocker; // 3297
+  const discount = couponApplied ? 200 : 0;
+  const taxable = subtotal - discount; // 3097
+  const cgst = Math.round(taxable * 0.06); // ~186
+  const sgst = Math.round(taxable * 0.06); // ~186
+  const totalGst = cgst + sgst; // 372
+  const netTotal = taxable + totalGst; // 3469
 
-      setConfirmation(json.data);
-      setScreen(5);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  // Payment method
+  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'NETBANKING'>('UPI');
+  const [upiVerified, setUpiVerified] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleSimulatePayment = () => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setStep(5); // Confirmed
+    }, 1500);
   };
-
-  if (!hold) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-xl font-bold text-white mb-4">No active booking hold found</h2>
-        <p className="text-sm text-slate-400 mb-6">
-          Please select your preferred dates and beds from our search page.
-        </p>
-        <Link
-          href="/"
-          className="px-6 py-2.5 bg-brand-500 text-slate-950 font-bold rounded-lg text-sm"
-        >
-          Return to Discovery
-        </Link>
-      </div>
-    );
-  }
-
-  const minutes = Math.floor(remainingSeconds / 60);
-  const seconds = remainingSeconds % 60;
-  const grandTotalPaise = Math.max(0, hold.pricing.totalGrandAmountPaise - discountPaise);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* 5-Screen Progress Indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-2">
-          <span className={screen >= 1 ? 'text-brand-500 font-extrabold' : ''}>1. Stay Selection</span>
-          <span className={screen >= 2 ? 'text-brand-500 font-extrabold' : ''}>2. Guest Details</span>
-          <span className={screen >= 3 ? 'text-brand-500 font-extrabold' : ''}>3. Review & Offers</span>
-          <span className={screen >= 4 ? 'text-brand-500 font-extrabold' : ''}>4. Payment</span>
-          <span className={screen === 5 ? 'text-brand-500 font-extrabold' : ''}>5. Confirmation</span>
+    <div className="w-full max-w-md bg-slate-950 min-h-screen relative flex flex-col pb-24 shadow-2xl overflow-x-hidden border-x border-slate-900/60 font-body">
+      {/* Top Header */}
+      <header className="bg-slate-900/90 backdrop-blur-md sticky top-0 z-50 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+        <Link href="/" className="flex items-center space-x-2 text-slate-300 hover:text-white">
+          <span className="material-symbols-outlined text-lg">arrow_back</span>
+          <span className="font-headline font-bold text-sm">HOTELYO Checkout</span>
+        </Link>
+        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          Step {step} of 5
+        </span>
+      </header>
+
+      {/* 10-Minute Inventory Hold Timer Banner */}
+      <div className="bg-amber-950/60 border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs text-amber-300">
+        <div className="flex items-center space-x-1.5">
+          <span className="material-symbols-outlined text-sm text-amber-400 animate-spin">timelapse</span>
+          <span className="font-medium">Inventory Hold Active:</span>
         </div>
-        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-          <div
-            className="bg-brand-500 h-full transition-all duration-300"
-            style={{ width: `${(screen / 5) * 100}%` }}
-          ></div>
-        </div>
+        <span className="font-mono font-extrabold text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-500/50">
+          ⏱️ {formatTimer(timeLeftSeconds)}
+        </span>
       </div>
 
-      {/* Hold Expiry Banner */}
-      {screen < 5 && (
-        <div className="mb-6 p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center justify-between">
-          <span>
-            ⏳ <strong>Temporary Hold Active:</strong> Your bed is held in the database for{' '}
-            <span className="font-mono font-bold text-white">
-              {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
-            </span>
-          </span>
-          <span className="text-[10px] text-amber-400 font-medium">Anti-Double-Booking Protection</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-6 p-4 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* SCREEN 1: STAY SELECTION SUMMARY */}
-      {screen === 1 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <h2 className="text-xl font-bold text-white">Screen 1 of 5: Review Stay Selection</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <div>
-              <span className="text-slate-400 block text-xs">Reference Hold:</span>
-              <span className="font-mono font-bold text-white">{hold.bookingReference}</span>
+      <main className="flex-1 p-4 space-y-4">
+        {/* Step 2: Rider Profile & Emergency Details */}
+        {step === 2 && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+              <h2 className="font-headline text-base font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-400 text-lg">person</span>
+                Nomad Rider Profile
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Required for ANPR gate pass & room keypad access</p>
             </div>
-            <div>
-              <span className="text-slate-400 block text-xs">Nights & Beds:</span>
-              <span className="text-white font-semibold">
-                {hold.pricing.totalNights} Nights • {hold.pricing.bedCount} Bed(s)
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                    Mobile (+91)
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                    Blood Group
+                  </label>
+                  <select
+                    value={bloodGroup}
+                    onChange={(e) => setBloodGroup(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+                  >
+                    <option>O+ve</option>
+                    <option>A+ve</option>
+                    <option>B+ve</option>
+                    <option>AB+ve</option>
+                    <option>O-ve</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Rider Vehicle Info */}
+              <div className="p-3 bg-slate-900/80 border border-amber-500/30 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase font-headline">
+                  <span className="material-symbols-outlined text-sm">two_wheeler</span>
+                  Touring Motorcycle Details
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Vehicle Model"
+                    value={vehicleModel}
+                    onChange={(e) => setVehicleModel(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Registration (e.g. MH 12 QX 4040)"
+                    value={vehiclePlate}
+                    onChange={(e) => setVehiclePlate(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-amber-400 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="p-3 bg-slate-900/80 border border-rose-500/30 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5 uppercase font-headline">
+                  <span className="material-symbols-outlined text-sm">emergency_home</span>
+                  Mandatory Emergency Contact
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Contact Name & Relation"
+                    value={emergencyName}
+                    onChange={(e) => setEmergencyName(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Emergency Phone"
+                    value={emergencyPhone}
+                    onChange={(e) => setEmergencyPhone(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setStep(3)}
+              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-headline font-bold text-xs py-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-lg shadow-amber-500/20"
+            >
+              <span>Continue to 12% GST & Price Review</span>
+              <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
+            </button>
+          </div>
+        )}
+
+        {/* Step 3: Review & 12% GST Tax Breakdown */}
+        {step === 3 && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="font-headline font-bold text-sm text-white">Itemized Stay Bill</span>
+                <span className="text-[11px] font-mono text-slate-400">3 Nights (14–17 Nov)</span>
+              </div>
+
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-300">
+                  <span>6-Bed AC Mixed Dorm (Bed #04)</span>
+                  <span className="font-mono">₹{baseDorm.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Secure CCTV Bike Parking (₹150 × 3)</span>
+                  <span className="font-mono">₹{bikeParking}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Heated Gear Locker (₹100 × 3)</span>
+                  <span className="font-mono">₹{gearLocker}</span>
+                </div>
+                <div className="flex justify-between text-amber-400 font-semibold pt-1 border-t border-slate-800">
+                  <span>Subtotal (Taxable Value)</span>
+                  <span className="font-mono">₹{subtotal.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {/* Coupon Row */}
+              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="material-symbols-outlined text-emerald-400 text-sm">local_offer</span>
+                  <span className="font-mono font-bold text-emerald-400">{couponCode}</span>
+                  <span className="text-[10px] text-slate-400">Applied</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-400">-₹{discount}</span>
+              </div>
+
+              {/* GST 12% Compliance Card */}
+              <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1 text-xs">
+                <div className="flex justify-between text-[11px] text-slate-400 uppercase font-semibold">
+                  <span>Mandatory GST Breakdown (12%)</span>
+                  <span>HSN 9963</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Central GST (CGST 6.0%)</span>
+                  <span className="font-mono">₹{cgst}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>State GST (SGST 6.0%)</span>
+                  <span className="font-mono">₹{sgst}</span>
+                </div>
+              </div>
+
+              {/* Total Payable */}
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-baseline">
+                <div>
+                  <span className="text-xs uppercase font-bold text-slate-400">Net Payable Total</span>
+                  <div className="text-[10px] text-emerald-400">Zero cancellation until 24h prior</div>
+                </div>
+                <div className="font-headline font-black text-2xl text-amber-400">
+                  ₹{netTotal.toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStep(2)}
+                className="py-3 px-4 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep(4)}
+                className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-headline font-bold text-xs py-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-lg shadow-amber-500/20"
+              >
+                <span>Proceed to Instant UPI Payment</span>
+                <span className="material-symbols-outlined text-sm font-bold">lock</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Instant UPI & Multi-Rail Payment */}
+        {step === 4 && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-3">
+              <div className="text-xs text-slate-400 font-label uppercase">Total Amount Due</div>
+              <div className="font-headline font-black text-3xl text-amber-400">
+                ₹{netTotal.toLocaleString('en-IN')}
+              </div>
+              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                Verified Merchant: HOTELYO HOSPITALITY PVT LTD
               </span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-xs">Base Accommodation:</span>
-              <span className="text-white font-semibold">₹{(hold.pricing.accommodationPaise / 100).toFixed(0)}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-xs">Add-ons:</span>
-              <span className="text-white font-semibold">
-                Parking: ₹{(hold.pricing.parkingPaise / 100).toFixed(0)} • Locker: ₹{(hold.pricing.lockerPaise / 100).toFixed(0)}
-              </span>
-            </div>
-          </div>
 
-          <div className="flex justify-end">
-            <button
-              onClick={() => setScreen(2)}
-              className="px-6 py-2.5 bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold rounded-lg text-sm transition"
-            >
-              Continue to Guest Details →
-            </button>
-          </div>
-        </div>
-      )}
+              {/* Live UPI QR Code */}
+              <div className="p-4 bg-white rounded-2xl inline-block shadow-2xl">
+                <img
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=hotelyo@icici%26pn=HOTELYO%20Hostel%26am=3469%26cu=INR"
+                  alt="UPI QR Code"
+                  className="w-44 h-44 mx-auto"
+                />
+                <div className="text-[11px] text-slate-700 font-bold mt-2 flex items-center justify-center gap-1">
+                  <span className="material-symbols-outlined text-sm">qr_code_scanner</span>
+                  Scan with any UPI App
+                </div>
+              </div>
 
-      {/* SCREEN 2: GUEST INFORMATION */}
-      {screen === 2 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <h2 className="text-xl font-bold text-white">Screen 2 of 5: Guest Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Full Legal Name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Email (for Receipt & Access Code)</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Phone Number (for 6-Digit Arrival OTP)</label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Nationality</label>
-              <input
-                type="text"
-                value={nationality}
-                onChange={(e) => setNationality(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-moto-500 mb-1">Motorcycle Make & Model</label>
-              <input
-                type="text"
-                value={bikeModel}
-                onChange={(e) => setBikeModel(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-moto-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-moto-500 mb-1">Bike Registration Number</label>
-              <input
-                type="text"
-                value={bikeRegNumber}
-                onChange={(e) => setBikeRegNumber(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-moto-500"
-              />
-            </div>
-          </div>
+              {/* Quick App Buttons */}
+              <div className="grid grid-cols-4 gap-2 pt-2">
+                <button
+                  onClick={handleSimulatePayment}
+                  className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center gap-1 text-[10px] text-slate-200"
+                >
+                  <span className="material-symbols-outlined text-emerald-400 text-lg">payments</span>
+                  GPay
+                </button>
+                <button
+                  onClick={handleSimulatePayment}
+                  className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center gap-1 text-[10px] text-slate-200"
+                >
+                  <span className="material-symbols-outlined text-purple-400 text-lg">account_balance_wallet</span>
+                  PhonePe
+                </button>
+                <button
+                  onClick={handleSimulatePayment}
+                  className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center gap-1 text-[10px] text-slate-200"
+                >
+                  <span className="material-symbols-outlined text-sky-400 text-lg">credit_card</span>
+                  Paytm
+                </button>
+                <button
+                  onClick={handleSimulatePayment}
+                  className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center gap-1 text-[10px] text-slate-200"
+                >
+                  <span className="material-symbols-outlined text-amber-400 text-lg">currency_rupee</span>
+                  BHIM
+                </button>
+              </div>
 
-          <div className="flex justify-between pt-4 border-t border-slate-800">
-            <button
-              onClick={() => setScreen(1)}
-              className="px-4 py-2 border border-slate-700 text-slate-300 font-semibold rounded-lg text-sm"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={() => setScreen(3)}
-              className="px-6 py-2.5 bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold rounded-lg text-sm transition"
-            >
-              Continue to Offers & Review →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* SCREEN 3: REVIEW & OFFERS */}
-      {screen === 3 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <h2 className="text-xl font-bold text-white">Screen 3 of 5: Review & Apply Coupons</h2>
-
-          {/* Coupon Entry */}
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center gap-3">
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value)}
-              placeholder="Enter Coupon Code (e.g. MOTOEXPLORE10)"
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white uppercase focus:outline-none focus:border-brand-500"
-            />
-            <button
-              type="button"
-              onClick={applyCoupon}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-brand-400 font-bold rounded-lg text-sm border border-slate-700"
-            >
-              Apply Code
-            </button>
-          </div>
-
-          {couponApplied && (
-            <div className="text-xs text-brand-400 font-bold bg-brand-950/40 p-2 rounded border border-brand-500/30">
-              ✓ Coupon MOTOEXPLORE10 applied: ₹{(discountPaise / 100).toFixed(0)} saved!
+              {/* Direct UPI ID input */}
+              <div className="pt-2 flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter UPI ID (e.g. arjun@oksbi)"
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                />
+                <button
+                  onClick={handleSimulatePayment}
+                  className="px-3 py-2 bg-amber-500 text-slate-950 font-bold text-xs rounded-lg uppercase"
+                >
+                  Pay
+                </button>
+              </div>
             </div>
-          )}
 
-          {/* Full Price Breakdown */}
-          <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3 text-sm">
-            <div className="flex justify-between text-slate-400">
-              <span>Accommodation Subtotal ({hold.pricing.totalNights} nights)</span>
-              <span>₹{(hold.pricing.accommodationPaise / 100).toFixed(2)}</span>
-            </div>
-            {hold.pricing.parkingPaise > 0 && (
-              <div className="flex justify-between text-slate-400">
-                <span>Gated Motorcycle Parking</span>
-                <span>₹{(hold.pricing.parkingPaise / 100).toFixed(2)}</span>
+            {isProcessing && (
+              <div className="p-3 bg-amber-950/80 border border-amber-500/50 rounded-xl text-center text-xs text-amber-300 font-bold animate-pulse">
+                Verifying bank settlement via webhook...
               </div>
             )}
-            {hold.pricing.lockerPaise > 0 && (
-              <div className="flex justify-between text-slate-400">
-                <span>Riding Gear Locker</span>
-                <span>₹{(hold.pricing.lockerPaise / 100).toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* Step 5: Confirmed Voucher & Digital Gate PIN */}
+        {step === 5 && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="p-5 bg-slate-900 border-2 border-emerald-500 rounded-2xl text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500 flex items-center justify-center text-emerald-400 mx-auto">
+                <span className="material-symbols-outlined text-2xl font-bold">check_circle</span>
               </div>
-            )}
-            {discountPaise > 0 && (
-              <div className="flex justify-between text-brand-400 font-semibold">
-                <span>Coupon Discount</span>
-                <span>-₹{(discountPaise / 100).toFixed(2)}</span>
+              <div>
+                <h2 className="font-headline font-black text-xl text-white">Booking Confirmed!</h2>
+                <p className="text-xs text-slate-400">Ref: #HY-ANJ-9482 • GST Invoice Issued</p>
               </div>
-            )}
-            <div className="flex justify-between text-slate-400">
-              <span>CGST (6%)</span>
-              <span>₹{(hold.pricing.cgstPaise / 100).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-slate-400">
-              <span>SGST (6%)</span>
-              <span>₹{(hold.pricing.sgstPaise / 100).toFixed(2)}</span>
-            </div>
-            <div className="pt-3 border-t border-slate-800 flex justify-between text-lg font-black text-white">
-              <span>Total Payable Amount</span>
-              <span className="text-brand-400">₹{(grandTotalPaise / 100).toFixed(2)}</span>
-            </div>
-          </div>
 
-          <div className="flex justify-between pt-4 border-t border-slate-800">
-            <button
-              onClick={() => setScreen(2)}
-              className="px-4 py-2 border border-slate-700 text-slate-300 font-semibold rounded-lg text-sm"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={() => setScreen(4)}
-              className="px-6 py-2.5 bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold rounded-lg text-sm transition"
-            >
-              Proceed to Payment →
-            </button>
-          </div>
-        </div>
-      )}
+              {/* Digital Pass Box */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-amber-500/40 space-y-2 text-left">
+                <div className="text-[10px] font-mono uppercase text-amber-400 font-bold">
+                  ⚡ Digital Hostel Keycode
+                </div>
+                <div className="font-mono text-3xl font-black text-white tracking-widest">
+                  8492#
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Valid for: Dorm 101, Gear Locker #07 & ANPR Barrier Clearance for <strong className="text-slate-200">MH 12 QX 4040</strong>.
+                </p>
+              </div>
 
-      {/* SCREEN 4: PAYMENT */}
-      {screen === 4 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <h2 className="text-xl font-bold text-white">Screen 4 of 5: Payment (Indian Gateway)</h2>
-          <p className="text-xs text-slate-400">
-            Secure 256-bit encrypted checkout. Amount to be captured:{' '}
-            <strong className="text-white">₹{(grandTotalPaise / 100).toFixed(2)}</strong>
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div
-              onClick={() => setPaymentMethod('UPI')}
-              className={`p-4 rounded-xl border cursor-pointer transition ${
-                paymentMethod === 'UPI'
-                  ? 'border-brand-500 bg-brand-950/20 ring-2 ring-brand-500'
-                  : 'border-slate-800 bg-slate-950'
-              }`}
-            >
-              <div className="font-bold text-white text-sm">⚡ Instant UPI</div>
-              <p className="text-xs text-slate-400 mt-1">Google Pay, PhonePe, Paytm, BHIM</p>
-            </div>
-
-            <div
-              onClick={() => setPaymentMethod('CARD')}
-              className={`p-4 rounded-xl border cursor-pointer transition ${
-                paymentMethod === 'CARD'
-                  ? 'border-brand-500 bg-brand-950/20 ring-2 ring-brand-500'
-                  : 'border-slate-800 bg-slate-950'
-              }`}
-            >
-              <div className="font-bold text-white text-sm">💳 Credit / Debit Card</div>
-              <p className="text-xs text-slate-400 mt-1">Visa, Mastercard, RuPay</p>
-            </div>
-
-            <div
-              onClick={() => setPaymentMethod('NET_BANKING')}
-              className={`p-4 rounded-xl border cursor-pointer transition ${
-                paymentMethod === 'NET_BANKING'
-                  ? 'border-brand-500 bg-brand-950/20 ring-2 ring-brand-500'
-                  : 'border-slate-800 bg-slate-950'
-              }`}
-            >
-              <div className="font-bold text-white text-sm">🏦 Net Banking</div>
-              <p className="text-xs text-slate-400 mt-1">All major Indian banks</p>
+              <div className="flex gap-2 pt-2">
+                <Link
+                  href="/"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"
+                >
+                  Return Home
+                </Link>
+                <a
+                  href="http://localhost:3001"
+                  target="_blank"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold"
+                >
+                  Open Staff PMS
+                </a>
+              </div>
             </div>
           </div>
-
-          <div className="flex justify-between pt-4 border-t border-slate-800">
-            <button
-              onClick={() => setScreen(3)}
-              className="px-4 py-2 border border-slate-700 text-slate-300 font-semibold rounded-lg text-sm"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={handleFinalPayment}
-              disabled={loading}
-              className="px-8 py-3 bg-brand-500 hover:bg-brand-400 text-slate-950 font-black rounded-xl text-base transition shadow-xl shadow-brand-500/20"
-            >
-              {loading ? 'Processing Payment...' : `Pay ₹${(grandTotalPaise / 100).toFixed(2)} Now`}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* SCREEN 5: CONFIRMATION & RECEIPT */}
-      {screen === 5 && confirmation && (
-        <div className="bg-slate-900 border border-brand-500/50 rounded-2xl p-8 shadow-2xl space-y-6 text-center">
-          <div className="w-16 h-16 bg-brand-500/20 text-brand-400 rounded-full flex items-center justify-center text-3xl mx-auto border border-brand-500/40">
-            ✓
-          </div>
-
-          <div>
-            <span className="text-xs font-bold text-brand-400 uppercase tracking-widest">
-              Booking Confirmed
-            </span>
-            <h2 className="text-3xl font-black text-white mt-1">
-              Ref: {confirmation.bookingReference}
-            </h2>
-            <p className="text-xs text-slate-400 mt-2">
-              Receipt and pre-arrival instructions have been dispatched to{' '}
-              <strong className="text-white">{confirmation.guest.email}</strong>
-            </p>
-          </div>
-
-          <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 text-left max-w-md mx-auto space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Payment Status:</span>
-              <span className="font-bold text-brand-400">Paid ({confirmation.payment.formattedAmountINR})</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Method:</span>
-              <span className="font-semibold text-white">{confirmation.payment.method}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Folio Account:</span>
-              <span className="font-mono text-xs text-slate-300">{confirmation.folioId}</span>
-            </div>
-          </div>
-
-          {/* Pre-arrival Checklist */}
-          <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 text-left max-w-md mx-auto">
-            <h3 className="text-sm font-bold text-white mb-3">Pre-Arrival Checklist</h3>
-            <ul className="text-xs space-y-2.5 text-slate-300">
-              <li className="flex items-start gap-2">
-                <span className="text-brand-500 font-bold">1.</span>
-                <span><strong>Pre-Check-in ID Upload:</strong> Upload your government photo ID (Aadhaar / Passport) before arrival.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-brand-500 font-bold">2.</span>
-                <span><strong>6-Digit Arrival OTP:</strong> Will be sent to your phone ({confirmation.guest.phone}) on check-in day.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-brand-500 font-bold">3.</span>
-                <span><strong>Room Access Code:</strong> Will be active immediately upon front-desk OTP verification.</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="pt-4">
-            <Link
-              href="/"
-              className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg text-sm transition"
-            >
-              Return to Home
-            </Link>
-          </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading checkout session...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-white">Loading checkout session...</div>}>
       <CheckoutContent />
     </Suspense>
   );

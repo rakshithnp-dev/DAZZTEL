@@ -5,20 +5,24 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        headline: ['Space Grotesk', 'sans-serif'],
+        display: ['Space Grotesk', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+        label: ['Public Sans', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
       colors: {
         brand: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          900: '#14532d',
+          500: '#f59e0b',
+          600: '#d97706',
         },
         moto: {
-          500: '#f97316', // Orange highlight for touring motorcyclists
-          600: '#ea580c',
+          500: '#f59e0b',
+          600: '#d97706',
         },
       },
     },

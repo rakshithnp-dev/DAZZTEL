@@ -5,16 +5,24 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        headline: ['Space Grotesk', 'sans-serif'],
+        display: ['Space Grotesk', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+        label: ['Public Sans', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
       colors: {
         brand: {
-          500: '#8b5cf6', // Violet/Purple for Platform Administration
-          600: '#7c3aed',
-          700: '#6d28d9',
+          500: '#f59e0b',
+          600: '#d97706',
         },
         moto: {
-          500: '#f97316',
+          500: '#f59e0b',
+          600: '#d97706',
         },
       },
     },
