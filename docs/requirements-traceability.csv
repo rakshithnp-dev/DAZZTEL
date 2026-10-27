@@ -1,0 +1,42 @@
+Requirement ID,Scope,Category,Description,Module,API Endpoint,Database Entity,Test Suite
+REQ-ID-01,Option A,Identity,User registration & login with Argon2id,AuthModule,/api/v1/auth/*,User; UserCredential,auth.service.spec.ts
+REQ-ID-02,Option A,Identity,Short-lived JWT (15m) & rotating refresh tokens,AuthModule,/api/v1/auth/refresh,Session,auth.service.spec.ts
+REQ-RBAC-01,Option A,Authorization,Role-based access control (8 roles),AuthModule,All endpoints,Role; UserRoleAssignment,authorization.guard.spec.ts
+REQ-RBAC-02,Option A,Authorization,Property-scoped multi-tenant data isolation,AuthModule,All staff endpoints,PropertyMembership,property-isolation.spec.ts
+REQ-PROP-01,Option A,Property,Multi-property management & timezone/rules,PropertyModule,/api/v1/properties/*,Property; PropertySetting,property.service.spec.ts
+REQ-INV-01,Option A,Inventory,Room and bed inventory tracking,InventoryModule,/api/v1/rooms/*; /beds/*,Room; Bed,inventory.service.spec.ts
+REQ-INV-02,Option A,Inventory,Motorcyclist bed segment (~50%) & parking/lockers,InventoryModule,/api/v1/inventory/motorcycle,BedSegment; ParkingSpace; GearLocker,motorcycle-inventory.spec.ts
+REQ-BKG-01,Option A,Booking,Search availability and upfront pricing,SearchModule,/api/v1/availability/search,BedNightAllocation,search.service.spec.ts
+REQ-BKG-02,Option A,Booking,Five-screen checkout workflow,BookingModule,/api/v1/bookings/checkout,Booking; BookingItem,checkout.e2e.spec.ts
+REQ-BKG-03,Option A,Booking,Database-enforced anti-double-booking constraint,BookingModule,/api/v1/bookings/hold,BedNightAllocation,double-booking-concurrency.spec.ts
+REQ-BKG-04,Option A,Booking,10-minute hold expiry worker,BookingWorker,Worker cron,BookingHold,hold-expiry.worker.spec.ts
+REQ-BKG-05,Option A,Booking,Idempotency key enforcement on booking creation,BookingModule,/api/v1/bookings/*,IdempotencyRecord,idempotency.spec.ts
+REQ-BKG-06,Option A,Booking,Cancellation and policy-based refund computation,BookingModule,/api/v1/bookings/:id/cancel,BookingCancellation,cancellation.service.spec.ts
+REQ-PAY-01,Option A,Payment,Indian payment gateway integration (UPI/Cards),PaymentModule,/api/v1/payments/*,Payment; PaymentAttempt,payment.service.spec.ts
+REQ-PAY-02,Option A,Payment,Signed webhook verification & replay protection,PaymentModule,/api/v1/payments/webhook,PaymentWebhookEvent,payment-webhook-replay.spec.ts
+REQ-PAY-03,Option A,Payment,Sequential GST tax invoices per FY,FinanceModule,/api/v1/invoices/*,TaxInvoice; CreditNote,invoice.service.spec.ts
+REQ-PAY-04,Option A,Payment,Guest folio tracking & day close revenue lock,FinanceModule,/api/v1/folios/*; /pms/day-close,GuestFolio; DailyClose,day-close.service.spec.ts
+REQ-ARR-01,Option A,Arrival,Pre-check-in ID document upload to private S3,ArrivalModule,/api/v1/identity-documents/*,IdentityDocument,document.service.spec.ts
+REQ-ARR-02,Option A,Arrival,Cryptographic 6-digit arrival OTP challenge,ArrivalModule,/api/v1/check-in/otp/*,ArrivalOTPChallenge,otp.service.spec.ts
+REQ-ARR-03,Option A,Arrival,Room access code issuance & 60s revocation,AccessModule,/api/v1/access-codes/*,AccessCode; AccessRevocationRecord,access-code.service.spec.ts
+REQ-PMS-01,Option A,PMS,Front-desk dashboard (arrivals/departures/room status),PmsModule,/api/v1/pms/dashboard,Booking; Room; Bed,pms.service.spec.ts
+REQ-PMS-02,Option A,PMS,Front-desk walk-in reservation,PmsModule,/api/v1/pms/walk-in,Booking; BedNightAllocation,walk-in.service.spec.ts
+REQ-OPS-01,Option A,Operations,Automated housekeeping tasks on checkout,OperationsModule,/api/v1/housekeeping/*,HousekeepingTask,housekeeping.service.spec.ts
+REQ-OPS-02,Option A,Operations,Maintenance tickets & bed inventory blocking,OperationsModule,/api/v1/maintenance/*,MaintenanceTicket; InventoryBlock,maintenance.service.spec.ts
+REQ-OPS-03,Option A,Operations,Guest service request queue,OperationsModule,/api/v1/service-requests/*,GuestServiceRequest,service-request.service.spec.ts
+REQ-SAF-01,Option A,Safety,1-click guest SOS emergency alert,SafetyModule,/api/v1/sos/trigger,SOSAlert,sos.service.spec.ts
+REQ-SAF-02,Option A,Safety,2-minute automated escalation chain,SafetyModule,/api/v1/sos/escalate,SOSEscalation,sos-escalation.worker.spec.ts
+REQ-NOT-01,Option A,Notifications,Multi-channel notifications (SMS/Email/In-App),NotificationModule,/api/v1/notifications/*,Notification; NotificationTemplate,notification.service.spec.ts
+REQ-PWA-01,Option A,Platform,Installable PWA with offline shell & last booking,ClientApp,/manifest.json; /sw.js,CacheStorage; IndexedDB,pwa-offline.spec.ts
+REQ-OPTB-01,Option B,Booking,Coupon & promo code management & anti-stacking,CouponModule,/api/v1/coupons/*,Coupon; CouponRedemption,coupon.service.spec.ts
+REQ-OPTB-02,Option B,Booking,Multi-bed group bookings under single reference,GroupBookingModule,/api/v1/group-bookings/*,GroupBooking; GroupBookingMember,group-booking.service.spec.ts
+REQ-OPTB-03,Option B,Payment,Saved payment method references (tokenized),PaymentModule,/api/v1/payments/methods,SavedPaymentMethodReference,saved-payment.service.spec.ts
+REQ-OPTB-04,Option B,Inventory,Automatic release of unsold motorcycle beds,InventoryWorker,Worker cron,BedSegment; BedNightAllocation,motorcycle-release.worker.spec.ts
+REQ-OPTB-05,Option B,Arrival,Visitor access passes & extended stay codes,AccessModule,/api/v1/visitors/*,VisitorAccessPass; ExtendedStayAccessRecord,visitor-access.service.spec.ts
+REQ-OPTB-06,Option B,PMS,Socket.IO live operational updates for staff,RealtimeGateway,WebSocket /events,SocketRooms,realtime.gateway.spec.ts
+REQ-OPTB-07,Option B,Analytics,Occupancy, RevPAB, RevPAR, net revenue analytics,AnalyticsModule,/api/v1/analytics/*,Indexed query views,analytics.service.spec.ts
+REQ-OPTB-08,Option B,Notifications,Web push notifications via FCM,NotificationModule,/api/v1/push-subscriptions/*,PushSubscription,web-push.service.spec.ts
+REQ-OPTB-09,Option B,Marketplace,Food ordering & isolated vendor inbox,MarketplaceModule,/api/v1/food-orders/*; /vendors/*,MenuItem; FoodOrder; VendorProfile,food-ordering.service.spec.ts
+REQ-OPTB-10,Option B,Marketplace,Laundry ordering & fulfillment workflows,MarketplaceModule,/api/v1/laundry-orders/*,LaundryService; LaundryOrder,laundry.service.spec.ts
+REQ-OPTB-11,Option B,Engagement,FAQ category management & search,EngagementModule,/api/v1/faqs/*,FAQCategory; FAQArticle,faq.service.spec.ts
+REQ-OPTB-12,Option B,Engagement,Immutable loyalty ledger (points earn/redeem),EngagementModule,/api/v1/loyalty/*,LoyaltyAccount; LoyaltyLedgerEntry,loyalty.service.spec.ts

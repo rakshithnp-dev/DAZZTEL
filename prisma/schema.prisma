@@ -1,0 +1,1159 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum RoleName {
+  GUEST
+  GROUP_ORGANIZER
+  FRONT_DESK
+  HOUSEKEEPING
+  MAINTENANCE
+  PROPERTY_MANAGER
+  VENDOR
+  PLATFORM_ADMIN
+}
+
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum RoomType {
+  DORM_MALE
+  DORM_FEMALE
+  DORM_MIXED
+  PRIVATE_ROOM
+}
+
+enum BedSegment {
+  STANDARD
+  MOTORCYCLE_RESERVED
+}
+
+enum BedAllocationStatus {
+  HOLD
+  CONFIRMED
+  MAINTENANCE_BLOCK
+  RELEASED
+}
+
+enum BookingStatus {
+  DRAFT
+  PAYMENT_PENDING
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethodType {
+  UPI
+  CARD
+  NET_BANKING
+  WALLET
+  CASH_AT_DESK
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum FolioStatus {
+  OPEN
+  SETTLED
+  CLOSED
+}
+
+enum FolioItemType {
+  ACCOMMODATION
+  PARKING
+  LOCKER
+  FOOD
+  LAUNDRY
+  DISCOUNT
+  PAYMENT_CREDIT
+  REFUND_DEBIT
+  TAX
+}
+
+enum DocumentType {
+  AADHAAR
+  PASSPORT
+  DRIVING_LICENSE
+  VOTER_ID
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AccessCodeStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum HousekeepingStatus {
+  PENDING
+  IN_PROGRESS
+  CLEANED
+  INSPECTED
+  BLOCKED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  REPORTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+enum SosStatus {
+  TRIGGERED
+  ACKNOWLEDGED
+  ESCALATED
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum LoyaltyTxType {
+  EARNED
+  REDEEMED
+  EXPIRED
+  ADJUSTMENT
+  REVERSAL
+}
+
+// ----------------------------------------------------
+// 1. IDENTITY & TENANCY
+// ----------------------------------------------------
+
+model User {
+  id              String           @id @default(uuid())
+  email           String?          @unique
+  phone           String?          @unique
+  fullName        String
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  credentials     UserCredential?
+  roleAssignments UserRoleAssignment[]
+  memberships     PropertyMembership[]
+  sessions        Session[]
+  guestProfile    GuestProfile?
+  staffProfile    StaffProfile?
+  vendorProfile   VendorProfile?
+  loyaltyAccount  LoyaltyAccount?
+
+  bookings        Booking[]        @relation("PrimaryGuest")
+  createdTickets  MaintenanceTicket[] @relation("ReportedByUser")
+  assignedTasks   HousekeepingTask[]  @relation("AssignedHousekeeper")
+  assignedTickets MaintenanceTicket[] @relation("AssignedMaintenance")
+  sosAlerts       SOSAlert[]       @relation("GuestSos")
+  sosAcks         SOSAcknowledgement[] @relation("StaffSosAck")
+  foodOrders      FoodOrder[]      @relation("GuestFoodOrders")
+  laundryOrders   LaundryOrder[]   @relation("GuestLaundryOrders")
+  feedbackGiven   Feedback[]
+  auditLogs       AuditLog[]       @relation("ActorAuditLogs")
+}
+
+model UserCredential {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  passwordHash String?
+  mfaSecret    String?
+  mfaEnabled   Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id          String               @id @default(uuid())
+  name        RoleName             @unique
+  description String?
+  assignments UserRoleAssignment[]
+}
+
+model UserRoleAssignment {
+  id         String   @id @default(uuid())
+  userId     String
+  roleId     String
+  propertyId String?  // Nullable for global PLATFORM_ADMIN
+  createdAt  DateTime @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, propertyId])
+}
+
+model PropertyMembership {
+  id         String   @id @default(uuid())
+  userId     String
+  propertyId String
+  title      String?  // e.g. "Operations Manager"
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GuestProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  nationality     String?  @default("IN")
+  emergencyName   String?
+  emergencyPhone  String?
+  motorcyclist    Boolean  @default(false)
+  bikeModel       String?
+  bikeRegNumber   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StaffProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  employeeCode    String?  @unique
+  department      String?
+  isOnDuty        Boolean  @default(false)
+  shiftStartTime  DateTime?
+  shiftEndTime    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VendorProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  propertyId      String
+  businessName    String
+  serviceCategory String   // FOOD or LAUNDRY
+  contactPhone    String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  menuItems       MenuItem[]
+  laundryServices LaundryService[]
+  foodOrders      FoodOrder[]
+  laundryOrders   LaundryOrder[]
+}
+
+// ----------------------------------------------------
+// 2. PROPERTY & INVENTORY
+// ----------------------------------------------------
+
+model Property {
+  id              String         @id @default(uuid())
+  code            String         @unique // e.g. GOA-ANJ-01
+  name            String
+  description     String?
+  timezone        String         @default("Asia/Kolkata")
+  currency        String         @default("INR")
+  addressLine1    String
+  addressLine2    String?
+  city            String
+  state           String
+  postalCode      String
+  country         String         @default("IN")
+  latitude        Float?
+  longitude       Float?
+  gstin           String?
+  phone           String
+  email           String
+  status          PropertyStatus @default(ACTIVE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  setting         PropertySetting?
+  rooms           Room[]
+  parkingSpaces   ParkingSpace[]
+  gearLockers     GearLocker[]
+  ratePlans       RatePlan[]
+  bookings        Booking[]
+  memberships     PropertyMembership[]
+  roleAssignments UserRoleAssignment[]
+  vendors         VendorProfile[]
+  housekeeping    HousekeepingTask[]
+  maintenance     MaintenanceTicket[]
+  sosAlerts       SOSAlert[]
+  dailyCloses     DailyClose[]
+  menuItems       MenuItem[]
+  laundryServices LaundryService[]
+  faqCategories   FAQCategory[]
+}
+
+model PropertySetting {
+  id                           String   @id @default(uuid())
+  propertyId                   String   @unique
+  motorcycleBedPercent         Int      @default(50) // Default 50%
+  motorcycleReleaseHoursBefore Int      @default(24) // Auto-release 24h prior to arrival
+  standardCheckInTime          String   @default("13:00")
+  standardCheckOutTime         String   @default("11:00")
+  holdTimeoutMinutes           Int      @default(10)
+  sosEscalationMinutes         Int      @default(2)
+  gstNumber                    String?
+  cgstPercent                  Decimal  @default(6.0)
+  sgstPercent                  Decimal  @default(6.0)
+  igstPercent                  Decimal  @default(12.0)
+  allowFolioPost               Boolean  @default(true)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  property                     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model Room {
+  id              String         @id @default(uuid())
+  propertyId      String
+  roomNumber      String
+  roomType        RoomType
+  totalBeds       Int
+  floor           Int?           @default(1)
+  basePricePaise  Int            // In paise (minor units)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  property        Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  beds            Bed[]
+  inventoryBlocks InventoryBlock[]
+  maintenanceTickets MaintenanceTicket[]
+
+  @@unique([propertyId, roomNumber])
+}
+
+model Bed {
+  id              String              @id @default(uuid())
+  roomId          String
+  bedNumber       String
+  segment         BedSegment          @default(STANDARD)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  room            Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  allocations     BedNightAllocation[]
+  housekeeping    HousekeepingTask[]
+  accessCodes     AccessCode[]
+
+  @@unique([roomId, bedNumber])
+}
+
+// Single Source of Truth for double-booking prevention:
+model BedNightAllocation {
+  id              String              @id @default(uuid())
+  bedId           String
+  calendarDate    DateTime            @db.Date
+  status          BedAllocationStatus
+  bookingItemId   String?
+  bookingHoldId   String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  bed             Bed                 @relation(fields: [bedId], references: [id], onDelete: Cascade)
+  bookingItem     BookingItem?        @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+  bookingHold     BookingHold?        @relation(fields: [bookingHoldId], references: [id], onDelete: SetNull)
+
+  // Enforces at DB level: Exactly one active hold, confirmed booking, or maintenance block per bed per calendar date:
+  @@unique([bedId, calendarDate])
+  @@index([calendarDate, status])
+}
+
+model InventoryBlock {
+  id          String   @id @default(uuid())
+  roomId      String
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  reason      String
+  createdAt   DateTime @default(now())
+
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model RatePlan {
+  id          String        @id @default(uuid())
+  propertyId  String
+  name        String
+  description String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rates       NightlyRate[]
+}
+
+model NightlyRate {
+  id             String   @id @default(uuid())
+  ratePlanId     String
+  calendarDate   DateTime @db.Date
+  roomType       RoomType
+  pricePaise     Int      // Minor unit
+  createdAt      DateTime @default(now())
+
+  ratePlan       RatePlan @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
+
+  @@unique([ratePlanId, calendarDate, roomType])
+}
+
+model ParkingSpace {
+  id              String      @id @default(uuid())
+  propertyId      String
+  spaceNumber     String
+  dailyRatePaise  Int         @default(10000) // ₹100/day
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+
+  property        Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservations    BookableResourceReservation[]
+
+  @@unique([propertyId, spaceNumber])
+}
+
+model GearLocker {
+  id              String      @id @default(uuid())
+  propertyId      String
+  lockerNumber    String
+  dailyRatePaise  Int         @default(5000) // ₹50/day
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+
+  property        Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservations    BookableResourceReservation[]
+
+  @@unique([propertyId, lockerNumber])
+}
+
+model BookableResourceReservation {
+  id              String        @id @default(uuid())
+  bookingId       String
+  parkingSpaceId  String?
+  gearLockerId    String?
+  calendarDate    DateTime      @db.Date
+  createdAt       DateTime      @default(now())
+
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  parkingSpace    ParkingSpace? @relation(fields: [parkingSpaceId], references: [id], onDelete: SetNull)
+  gearLocker      GearLocker?   @relation(fields: [gearLockerId], references: [id], onDelete: SetNull)
+
+  @@index([calendarDate])
+}
+
+// ----------------------------------------------------
+// 3. RESERVATIONS & BOOKINGS
+// ----------------------------------------------------
+
+model Booking {
+  id                     String           @id @default(uuid())
+  bookingReference       String           @unique // e.g. HY-2026-X892
+  propertyId             String
+  primaryGuestId         String
+  status                 BookingStatus    @default(DRAFT)
+  checkInDate            DateTime         @db.Date
+  checkOutDate           DateTime         @db.Date
+  totalNights            Int
+  guestCount             Int              @default(1)
+  motorcycleStay         Boolean          @default(false)
+  totalBaseAmountPaise   Int              // Integer minor units
+  totalTaxAmountPaise    Int
+  totalDiscountAmountPaise Int            @default(0)
+  totalGrandAmountPaise  Int
+  notes                  String?
+  idempotencyKey         String?          @unique
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  property               Property         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  primaryGuest           User             @relation("PrimaryGuest", fields: [primaryGuestId], references: [id], onDelete: Restrict)
+  items                  BookingItem[]
+  guests                 BookingGuest[]
+  holds                  BookingHold[]
+  stateHistory           BookingStateHistory[]
+  cancellation           BookingCancellation?
+  payments               Payment[]
+  folio                  GuestFolio?
+  identityDocuments      IdentityDocument[]
+  otpChallenges          ArrivalOTPChallenge[]
+  accessCodes            AccessCode[]
+  resourceReservations   BookableResourceReservation[]
+  groupBookingMember     GroupBookingMember?
+  couponRedemptions      CouponRedemption[]
+  foodOrders             FoodOrder[]
+  laundryOrders          LaundryOrder[]
+  feedback               Feedback?
+
+  @@index([propertyId, checkInDate, checkOutDate])
+  @@index([primaryGuestId, status])
+}
+
+model BookingItem {
+  id             String               @id @default(uuid())
+  bookingId      String
+  bedId          String?
+  ratePerNightPaise Int
+  totalAmountPaise Int
+  createdAt      DateTime             @default(now())
+
+  booking        Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  allocations    BedNightAllocation[]
+}
+
+model BookingGuest {
+  id             String    @id @default(uuid())
+  bookingId      String
+  fullName       String
+  email          String?
+  phone          String?
+  isPrimary      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  booking        Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model BookingHold {
+  id             String               @id @default(uuid())
+  bookingId      String
+  expiresAt      DateTime             // 10 minutes from creation
+  isReleased     Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+
+  booking        Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  allocations    BedNightAllocation[]
+
+  @@index([expiresAt, isReleased])
+}
+
+model BookingStateHistory {
+  id             String        @id @default(uuid())
+  bookingId      String
+  fromState      BookingStatus
+  toState        BookingStatus
+  actorId        String?
+  reason         String?
+  createdAt      DateTime      @default(now())
+
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model BookingCancellation {
+  id                 String   @id @default(uuid())
+  bookingId          String   @unique
+  cancelledAt        DateTime @default(now())
+  cancelledBy        String?
+  reason             String?
+  refundablePaise    Int      @default(0)
+  cancellationFeePaise Int    @default(0)
+  refundStatus       RefundStatus @default(PENDING)
+
+  booking            Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model GroupBooking {
+  id             String               @id @default(uuid())
+  groupReference String               @unique // e.g. GRP-2026-0042
+  groupName      String
+  organizerName  String
+  organizerEmail String
+  organizerPhone String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  members        GroupBookingMember[]
+}
+
+model GroupBookingMember {
+  id             String       @id @default(uuid())
+  groupBookingId String
+  bookingId      String       @unique
+  guestName      String
+  createdAt      DateTime     @default(now())
+
+  groupBooking   GroupBooking @relation(fields: [groupBookingId], references: [id], onDelete: Cascade)
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
+  id               String             @id @default(uuid())
+  code             String             @unique
+  description      String?
+  isPercent        Boolean            @default(true)
+  discountValue    Int                // Percentage (e.g. 10) or fixed minor units (paise)
+  minSpendPaise    Int                @default(0)
+  maxDiscountPaise Int?
+  usageLimit       Int?
+  usageCount       Int                @default(0)
+  perUserLimit     Int                @default(1)
+  validFrom        DateTime
+  validUntil       DateTime
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+
+  redemptions      CouponRedemption[]
+}
+
+model CouponRedemption {
+  id             String   @id @default(uuid())
+  couponId       String
+  bookingId      String
+  discountPaise  Int
+  redeemedAt     DateTime @default(now())
+
+  coupon         Coupon   @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  booking        Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, bookingId])
+}
+
+// ----------------------------------------------------
+// 4. PAYMENTS, FOLIOS & INVOICING
+// ----------------------------------------------------
+
+model Payment {
+  id                 String            @id @default(uuid())
+  bookingId          String
+  gatewayPaymentId   String?           @unique // e.g. pay_XXXXX
+  gatewayOrderId     String?           // e.g. order_XXXXX
+  amountPaise        Int               // In paise
+  refundedAmountPaise Int              @default(0)
+  currency           String            @default("INR")
+  status             PaymentStatus     @default(INITIATED)
+  paymentMethod      PaymentMethodType @default(UPI)
+  idempotencyKey     String?           @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  booking            Booking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  attempts           PaymentAttempt[]
+  refunds            Refund[]
+
+  @@index([status, createdAt])
+}
+
+model PaymentAttempt {
+  id             String   @id @default(uuid())
+  paymentId      String
+  gatewayResponse Json?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  payment        Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+model PaymentWebhookEvent {
+  id             String   @id @default(uuid())
+  eventId        String   @unique // Gateway event ID for replay prevention
+  eventType      String
+  payload        Json
+  signature      String
+  processedAt    DateTime @default(now())
+}
+
+model Refund {
+  id               String       @id @default(uuid())
+  paymentId        String
+  gatewayRefundId  String?      @unique
+  amountPaise      Int
+  status           RefundStatus @default(PENDING)
+  reason           String?
+  createdAt        DateTime     @default(now())
+
+  payment          Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+}
+
+model SavedPaymentMethodReference {
+  id             String            @id @default(uuid())
+  userId         String
+  gatewayToken   String            @unique
+  methodType     PaymentMethodType
+  displayDetails String            // e.g. "HDFC UPI (...4821)" or "Visa ending 9012"
+  createdAt      DateTime          @default(now())
+
+  @@index([userId])
+}
+
+model GuestFolio {
+  id                 String          @id @default(uuid())
+  bookingId          String          @unique
+  status             FolioStatus     @default(OPEN)
+  totalChargesPaise  Int             @default(0)
+  totalPaymentsPaise Int             @default(0)
+  balancePaise       Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  booking            Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  lineItems          FolioLineItem[]
+  taxInvoices        TaxInvoice[]
+}
+
+model FolioLineItem {
+  id             String        @id @default(uuid())
+  folioId        String
+  itemType       FolioItemType
+  description    String
+  amountPaise    Int           // Positive for charge, negative for discount/payment
+  cgstPaise      Int           @default(0)
+  sgstPaise      Int           @default(0)
+  igstPaise      Int           @default(0)
+  postedAt       DateTime      @default(now())
+
+  folio          GuestFolio    @relation(fields: [folioId], references: [id], onDelete: Cascade)
+}
+
+model TaxInvoice {
+  id              String       @id @default(uuid())
+  folioId         String
+  invoiceNumber   String       @unique // Sequential e.g. INV/GOA01/2026-27/00042
+  financialYear   String       // e.g. 2026-2027
+  subtotalPaise   Int
+  cgstPaise       Int
+  sgstPaise       Int
+  igstPaise       Int
+  totalAmountPaise Int
+  issuedAt        DateTime     @default(now())
+
+  folio           GuestFolio   @relation(fields: [folioId], references: [id], onDelete: Restrict)
+  creditNotes     CreditNote[]
+}
+
+model CreditNote {
+  id               String     @id @default(uuid())
+  taxInvoiceId     String
+  creditNoteNumber String     @unique // Sequential e.g. CN/GOA01/2026-27/00005
+  amountPaise      Int
+  reason           String
+  issuedAt         DateTime   @default(now())
+
+  taxInvoice       TaxInvoice @relation(fields: [taxInvoiceId], references: [id], onDelete: Restrict)
+}
+
+model DailyClose {
+  id                   String   @id @default(uuid())
+  propertyId           String
+  businessDate         DateTime @db.Date
+  totalArrivals        Int
+  totalDepartures      Int
+  totalRevenuePaise    Int
+  totalPaymentsPaise   Int
+  totalRefundsPaise    Int
+  closedByUserId       String
+  closedAt             DateTime @default(now())
+  isLocked             Boolean  @default(true)
+
+  property             Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, businessDate])
+}
+
+// ----------------------------------------------------
+// 5. ARRIVAL & ACCESS SECURITY
+// ----------------------------------------------------
+
+model IdentityDocument {
+  id                 String             @id @default(uuid())
+  bookingId          String
+  documentType       DocumentType
+  storageKey         String             // S3 private key
+  fileName           String
+  fileSize           Int
+  mimeType           String
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedByUserId   String?
+  rejectionReason    String?
+  uploadedAt         DateTime           @default(now())
+  verifiedAt         DateTime?
+
+  booking            Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model ArrivalOTPChallenge {
+  id             String    @id @default(uuid())
+  bookingId      String
+  hashedOtp      String    // HMAC-SHA256 keyed hash
+  attemptsCount  Int       @default(0)
+  maxAttempts    Int       @default(5)
+  expiresAt      DateTime  // 15 minutes
+  isVerified     Boolean   @default(false)
+  verifiedAt     DateTime?
+  resendCooldown DateTime  // 30s cooldown
+  createdAt      DateTime  @default(now())
+
+  booking        Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, expiresAt])
+}
+
+model AccessCode {
+  id             String           @id @default(uuid())
+  bookingId      String
+  bedId          String?
+  codeValue      String           // Masked in UI
+  validFrom      DateTime
+  validUntil     DateTime
+  status         AccessCodeStatus @default(ACTIVE)
+  revokedAt      DateTime?
+  revokedReason  String?
+  createdAt      DateTime         @default(now())
+
+  booking        Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bed            Bed?             @relation(fields: [bedId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId, status])
+}
+
+model VisitorAccessPass {
+  id             String           @id @default(uuid())
+  propertyId     String
+  hostBookingId  String
+  visitorName    String
+  visitorPhone   String
+  passCode       String
+  validFrom      DateTime
+  validUntil     DateTime
+  status         AccessCodeStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+
+  @@index([propertyId, validFrom, validUntil])
+}
+
+// ----------------------------------------------------
+// 6. OPERATIONS & HOUSEKEEPING
+// ----------------------------------------------------
+
+model HousekeepingTask {
+  id             String             @id @default(uuid())
+  propertyId     String
+  bedId          String?
+  status         HousekeepingStatus @default(PENDING)
+  priority       Int                @default(1) // 1=High, 3=Normal
+  assignedToId   String?
+  notes          String?
+  cleanedAt      DateTime?
+  inspectedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  property       Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  bed            Bed?               @relation(fields: [bedId], references: [id], onDelete: SetNull)
+  assignedTo     User?              @relation("AssignedHousekeeper", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, status])
+}
+
+model MaintenanceTicket {
+  id             String              @id @default(uuid())
+  propertyId     String
+  roomId         String?
+  reportedById   String
+  assignedToId   String?
+  priority       MaintenancePriority @default(MEDIUM)
+  status         MaintenanceStatus   @default(REPORTED)
+  title          String
+  description    String
+  blocksInventory Boolean            @default(false)
+  resolvedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  property       Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room           Room?               @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  reportedBy     User                @relation("ReportedByUser", fields: [reportedById], references: [id], onDelete: Restrict)
+  assignedTo     User?               @relation("AssignedMaintenance", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, status])
+}
+
+// ----------------------------------------------------
+// 7. SAFETY & SOS
+// ----------------------------------------------------
+
+model SOSAlert {
+  id             String               @id @default(uuid())
+  propertyId     String
+  guestUserId    String
+  status         SosStatus            @default(TRIGGERED)
+  incidentNotes  String?
+  latitude       Float?
+  longitude      Float?
+  triggeredAt    DateTime             @default(now())
+  escalatedAt    DateTime?
+  resolvedAt     DateTime?
+
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guest          User                 @relation("GuestSos", fields: [guestUserId], references: [id], onDelete: Restrict)
+  acks           SOSAcknowledgement[]
+  escalations    SOSEscalation[]
+
+  @@index([propertyId, status])
+}
+
+model SOSAcknowledgement {
+  id             String   @id @default(uuid())
+  sosAlertId     String
+  staffUserId    String
+  acknowledgedAt DateTime @default(now())
+
+  sosAlert       SOSAlert @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+  staff          User     @relation("StaffSosAck", fields: [staffUserId], references: [id], onDelete: Restrict)
+}
+
+model SOSEscalation {
+  id             String   @id @default(uuid())
+  sosAlertId     String
+  escalatedTo    String   // Property Manager phone/email
+  reason         String   // e.g. "No acknowledgement within 2 minutes"
+  escalatedAt    DateTime @default(now())
+
+  sosAlert       SOSAlert @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+}
+
+// ----------------------------------------------------
+// 8. MARKETPLACE & VENDORS
+// ----------------------------------------------------
+
+model MenuItem {
+  id             String          @id @default(uuid())
+  propertyId     String
+  vendorId       String
+  category       String          // Breakfast, Snacks, Beverages
+  name           String
+  description    String?
+  pricePaise     Int             // Minor units
+  isVegetarian   Boolean         @default(true)
+  isAvailable    Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  vendor         VendorProfile   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orderItems     FoodOrderItem[]
+}
+
+model FoodOrder {
+  id             String          @id @default(uuid())
+  bookingId      String
+  vendorId       String
+  guestUserId    String
+  status         OrderStatus     @default(PENDING)
+  totalPaise     Int
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  booking        Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  vendor         VendorProfile   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  guest          User            @relation("GuestFoodOrders", fields: [guestUserId], references: [id], onDelete: Restrict)
+  items          FoodOrderItem[]
+}
+
+model FoodOrderItem {
+  id             String    @id @default(uuid())
+  foodOrderId    String
+  menuItemId     String
+  quantity       Int
+  pricePaise     Int
+
+  order          FoodOrder @relation(fields: [foodOrderId], references: [id], onDelete: Cascade)
+  menuItem       MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+}
+
+model LaundryService {
+  id             String        @id @default(uuid())
+  propertyId     String
+  vendorId       String
+  serviceName    String        // Wash & Fold, Express Ironing
+  pricePerKgPaise Int
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+
+  property       Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  vendor         VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orders         LaundryOrder[]
+}
+
+model LaundryOrder {
+  id             String         @id @default(uuid())
+  bookingId      String
+  vendorId       String
+  guestUserId    String
+  serviceId      String
+  weightKg       Float
+  totalPaise     Int
+  status         OrderStatus    @default(PENDING)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  booking        Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  vendor         VendorProfile  @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  guest          User           @relation("GuestLaundryOrders", fields: [guestUserId], references: [id], onDelete: Restrict)
+  service        LaundryService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+}
+
+// ----------------------------------------------------
+// 9. ENGAGEMENT, FAQ & LOYALTY
+// ----------------------------------------------------
+
+model Feedback {
+  id             String   @id @default(uuid())
+  bookingId      String   @unique
+  guestUserId    String
+  cleanlinessRating Int   // 1 to 5
+  staffRating    Int      // 1 to 5
+  overallRating  Int      // 1 to 5
+  comments       String?
+  createdAt      DateTime @default(now())
+
+  booking        Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  guest          User     @relation(fields: [guestUserId], references: [id], onDelete: Cascade)
+}
+
+model FAQCategory {
+  id             String       @id @default(uuid())
+  propertyId     String?      // Null for global platform FAQs
+  name           String
+  displayOrder   Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  property       Property?    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  articles       FAQArticle[]
+}
+
+model FAQArticle {
+  id             String      @id @default(uuid())
+  categoryId     String
+  question       String
+  answer         String
+  isPublished    Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  category       FAQCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model LoyaltyAccount {
+  id             String                @id @default(uuid())
+  userId         String                @unique
+  pointsBalance  Int                   @default(0)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries  LoyaltyLedgerEntry[]
+}
+
+model LoyaltyLedgerEntry {
+  id             String         @id @default(uuid())
+  accountId      String
+  type           LoyaltyTxType
+  points         Int            // Positive for earn/adjustment, negative for redeem
+  bookingId      String?
+  reason         String
+  createdAt      DateTime       @default(now())
+
+  account        LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  actorUserId    String?
+  action         String   // e.g. "DAY_CLOSE", "CANCEL_BOOKING", "VERIFY_ID"
+  resourceType   String   // e.g. "Booking", "TaxInvoice"
+  resourceId     String
+  diffJson       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  actor          User?    @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+}
+
+model FeatureFlag {
+  id             String   @id @default(uuid())
+  key            String   @unique
+  isEnabled      Boolean  @default(false)
+  description    String?
+  updatedAt      DateTime @updatedAt
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid())
+  key            String   @unique
+  path           String
+  statusCode     Int
+  responseJson   Json
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@index([expiresAt])
+}
