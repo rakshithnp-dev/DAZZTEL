@@ -430,15 +430,12 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
 
           {/* Right Header Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-            <span className="tag-badge tag-badge--amber">
-              50% Biker Lock
-            </span>
             <a
               href="tel:112"
               className="btn btn--danger-outline btn--sm"
               style={{ whiteSpace: 'nowrap' }}
             >
-              SOS 112
+              SOS
             </a>
           </div>
         </div>
