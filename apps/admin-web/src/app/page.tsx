@@ -2,635 +2,851 @@
 
 import React, { useState } from 'react';
 
-export default function AdminDashboardPage() {
-  // Motorcyclist allocation policy state
+interface AdminUser {
+  name: string;
+  email: string;
+  role: 'PLATFORM_ADMIN';
+}
+
+interface PurchaseOrder {
+  id: string;
+  vendor: string;
+  category: string;
+  items: string;
+  amount: number;
+  status: 'Pending' | 'Dispatched' | 'Delivered';
+  date: string;
+}
+
+interface LedgerRecord {
+  ref: string;
+  guest: string;
+  bike: string;
+  hub: string;
+  room: string;
+  dates: string;
+  invoice: string;
+  total: number;
+  payment: string;
+  access: string;
+  status: 'Confirmed' | 'Checked-In' | 'Departed';
+}
+
+export default function AdminExecutiveDashboard() {
+  // Admin Authentication State
+  const [adminUser, setAdminUser] = useState<AdminUser | null>({
+    name: 'Siddharth Varma',
+    email: 'admin@hotelyo.com',
+    role: 'PLATFORM_ADMIN',
+  });
+
+  const [loginEmail, setLoginEmail] = useState('admin@hotelyo.com');
+  const [loginPassword, setLoginPassword] = useState('admin123');
+
+  // Property Selector
+  const [selectedHub, setSelectedHub] = useState('Goa Vagator Hub');
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('30d');
+  const [activeTab, setActiveTab] = useState<'overview' | 'allocation' | 'pricing' | 'vendors' | 'ledger' | 'audit'>('overview');
+
+  // Policy Engine State
   const [allocationPct, setAllocationPct] = useState(50);
   const [autoReleaseEnabled, setAutoReleaseEnabled] = useState(true);
-  const [policySaved, setPolicySaved] = useState(false);
+  const [statusNotification, setStatusNotification] = useState('');
 
-  // Search and filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProperty, setSelectedProperty] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('All');
+  // Dynamic Pricing State (Phase 1b)
+  const [weekendSurge, setWeekendSurge] = useState(20);
+  const [monsoonDiscount, setMonsoonDiscount] = useState(15);
+  const [festivalPeakSurge, setFestivalPeakSurge] = useState(35);
 
-  const lockedBeds = Math.round(48 * (allocationPct / 100));
-  const generalBeds = 48 - lockedBeds;
+  // Vendor Management State (Phase 1b)
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([
+    {
+      id: 'PO-2026-091',
+      vendor: 'Goa Cleaners & Laundry Services',
+      category: 'Linen & Duvet Laundering',
+      items: '150x Pod Linen Sets + 80x Microfiber Towels',
+      amount: 14500,
+      status: 'Delivered',
+      date: '26 Oct 2026',
+    },
+    {
+      id: 'PO-2026-092',
+      vendor: 'Anjuna Organic Bakery Provisions',
+      category: 'Cafe Breakfast Inventory',
+      items: '50kg Sourdough Bread + Organic Eggs + Arabica Beans',
+      amount: 18200,
+      status: 'Dispatched',
+      date: '27 Oct 2026',
+    },
+    {
+      id: 'PO-2026-093',
+      vendor: 'Motul & Castrol Fluid Supplier',
+      category: 'Workshop Maintenance Fluids',
+      items: '24x Chain Lube (400ml) + 12x Brake Cleaners + 10W50 Oil',
+      amount: 22400,
+      status: 'Pending',
+      date: '28 Oct 2026',
+    },
+  ]);
+  const [newPoVendor, setNewPoVendor] = useState('Motul & Castrol Fluid Supplier');
+  const [newPoItems, setNewPoItems] = useState('');
+  const [newPoAmount, setNewPoAmount] = useState('');
 
-  const handleSavePolicy = () => {
-    setPolicySaved(true);
-    setTimeout(() => setPolicySaved(false), 3000);
+  // Search & Filter State
+  const [searchFilter, setSearchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  // Calculations based on hub capacity
+  const hubCapacities: Record<string, number> = {
+    'Goa Vagator Hub': 48,
+    'Manali Old Village Hub': 36,
+    'Leh Fort Road Hub': 28,
+  };
+  const totalBeds = hubCapacities[selectedHub] || 48;
+  const lockedBeds = Math.round(totalBeds * (allocationPct / 100));
+  const generalBeds = totalBeds - lockedBeds;
+
+  const showNotification = (msg: string) => {
+    setStatusNotification(msg);
+    setTimeout(() => setStatusNotification(''), 4000);
   };
 
-  // Ledger records
-  const ledgerData = [
+  const ledgerRecords: LedgerRecord[] = [
     {
-      ref: '#HY-ANJ-9482',
+      ref: '#HY-GOA-9482',
       guest: 'Arjun Singhania',
-      vehicle: 'RE Himalayan (MH 12 QX 4040)',
-      property: 'Goa Anjuna',
-      room: 'Bunk #101-A2',
+      bike: 'RE Himalayan 450 (MH 12 QX 4040)',
+      hub: 'Goa Vagator',
+      room: 'Pod 101-A2',
       dates: '14-17 Nov 2026',
-      addons: 'Bay #04 + Heated Locker',
       invoice: 'INV-2026-8841',
-      total: '₹3,493',
+      total: 3469,
       payment: 'Settled UPI (GPay)',
-      access: '8492# • Gate Cleared',
+      access: '8492#',
+      status: 'Confirmed',
     },
     {
       ref: '#HY-LEH-1049',
       guest: 'Vikram Rathore',
-      vehicle: 'KTM 390 Adv (DL 03 AP 9921)',
-      property: 'Leh Ladakh',
-      room: 'Pod #204-B1',
+      bike: 'KTM 390 Adv (DL 03 AP 9921)',
+      hub: 'Leh Fort Road',
+      room: 'Pod 204-B1',
       dates: '15-18 Nov 2026',
-      addons: 'Bay #01 + Tool Pass',
       invoice: 'INV-2026-8842',
-      total: '₹4,120',
+      total: 4120,
       payment: 'Settled Axis Card',
-      access: 'Issued 3910# • En Route',
+      access: '3910#',
+      status: 'Confirmed',
     },
     {
-      ref: '#HY-ANJ-9410',
+      ref: '#HY-GOA-9410',
       guest: 'Ananya Sen',
-      vehicle: 'BMW G310GS (KA 01 MR 7812)',
-      property: 'Goa Anjuna',
-      room: 'Bunk #102-A1',
+      bike: 'BMW G310GS (KA 01 MR 7812)',
+      hub: 'Goa Vagator',
+      room: 'Suite 102-A',
       dates: '14-16 Nov 2026',
-      addons: 'Locker Only',
       invoice: 'INV-2026-8843',
-      total: '₹2,850',
+      total: 5850,
       payment: 'Settled PhonePe',
-      access: '1104# • Gate Cleared',
+      access: '1104#',
+      status: 'Checked-In',
     },
     {
       ref: '#HY-MAN-3081',
       guest: 'Kabir Mehta',
-      vehicle: 'KTM 390 (HP 01 BB 2049)',
-      property: 'Manali Hub',
-      room: 'Pod #301-C2',
+      bike: 'KTM 390 Adv (HP 01 BB 2049)',
+      hub: 'Manali Old Village',
+      room: 'Pod 301-C2',
       dates: '16-19 Nov 2026',
-      addons: 'Bay #02',
       invoice: 'INV-2026-8844',
-      total: '₹3,790',
+      total: 3790,
       payment: 'Settled UPI',
-      access: '5821# • Active',
-    },
-    {
-      ref: '#HY-ANJ-9390',
-      guest: 'Priya Mohan',
-      vehicle: 'General Nomad',
-      property: 'Goa Anjuna',
-      room: 'Bunk #103-B2',
-      dates: '12-15 Nov 2026',
-      addons: 'Standard Locker',
-      invoice: 'INV-2026-8840',
-      total: '₹2,240',
-      payment: 'Settled HDFC NetBanking',
-      access: 'Completed Checkout',
+      access: '5821#',
+      status: 'Confirmed',
     },
   ];
 
-  const filteredLedger = ledgerData.filter((item) => {
+  const handleExportCsv = () => {
+    const headers = 'Reference,Guest Name,Vehicle,Hub,Room,Dates,Invoice,Amount INR,Payment Status,Door PIN,State\n';
+    const rows = ledgerRecords
+      .map(
+        (r) =>
+          `"${r.ref}","${r.guest}","${r.bike}","${r.hub}","${r.room}","${r.dates}","${r.invoice}",${r.total},"${r.payment}","${r.access}","${r.status}"`
+      )
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'HOTELYO_Master_Ledger_Export.csv';
+    link.click();
+    showNotification('Exported master institutional ledger CSV (HSN 9963 compliant).');
+  };
+
+  const handleCreatePo = () => {
+    if (!newPoItems || !newPoAmount) return;
+    setPurchaseOrders((prev) => [
+      {
+        id: `PO-2026-0${prev.length + 94}`,
+        vendor: newPoVendor,
+        category: 'Operational Supplies',
+        items: newPoItems,
+        amount: Number(newPoAmount),
+        status: 'Pending',
+        date: 'Today',
+      },
+      ...prev,
+    ]);
+    setNewPoItems('');
+    setNewPoAmount('');
+    showNotification('Purchase order generated and routed for approval.');
+  };
+
+  const filteredLedger = ledgerRecords.filter((rec) => {
     const matchesSearch =
-      item.guest.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.ref.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.vehicle.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesProperty = selectedProperty === 'All' || item.property.includes(selectedProperty);
-    return matchesSearch && matchesProperty;
+      rec.guest.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      rec.ref.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      rec.bike.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      rec.room.toLowerCase().includes(searchFilter.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || rec.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
-  return (
-    <div className="bg-slate-950 text-slate-100 font-body min-h-screen antialiased selection:bg-amber-500/20 selection:text-amber-300">
-      {/* Top Header */}
-      <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 py-3 border-b border-slate-800/80 backdrop-blur-md bg-slate-950/90 shadow-md">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20">
-              <span className="material-symbols-outlined text-2xl font-bold">sports_motorsports</span>
+  // ---------------------------------------------------------------------------
+  // AUTHENTICATION SCREEN IF NOT SIGNED IN
+  // ---------------------------------------------------------------------------
+  if (!adminUser) {
+    return (
+      <div className="min-h-screen bg-[#f9fbfc] flex items-center justify-center p-6 text-[#131416]">
+        <div className="w-full max-w-md bg-white border border-[#e8eaec] rounded-2xl p-8 space-y-6">
+          <div className="space-y-1">
+            <h1 className="text-xl font-semibold tracking-tight">HQ Executive Administration</h1>
+            <p className="text-xs text-[#5d5f60]">Authorized platform operations and yield governance</p>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div>
+              <label className="block text-[#5d5f60] mb-1">Administrator email</label>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-[#e8eaec] rounded-md text-xs text-[#131416] bg-[#f9fbfc]"
+              />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display font-extrabold text-xl tracking-tight text-amber-500">
-                  HOTELYO HQ
-                </span>
-                <span className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded font-semibold">
-                  HQ Node 01
-                </span>
-              </div>
-              <p className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
-                EXECUTIVE ADMIN PLATFORM
-              </p>
+              <label className="block text-[#5d5f60] mb-1">Master credentials</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-[#e8eaec] rounded-md text-xs text-[#131416] bg-[#f9fbfc]"
+              />
             </div>
+            <button
+              onClick={() =>
+                setAdminUser({
+                  name: 'Siddharth Varma',
+                  email: loginEmail,
+                  role: 'PLATFORM_ADMIN',
+                })
+              }
+              className="w-full py-2.5 bg-[#131416] hover:bg-[#2c2d30] text-white rounded-md text-xs font-medium transition-colors"
+            >
+              Sign in to platform
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // AUTHENTICATED FRAMED SHEET SHELL
+  // ---------------------------------------------------------------------------
+  return (
+    <div className="min-h-screen bg-[#f9fbfc] text-[#131416] flex flex-col antialiased">
+      {/* 48px Top bar on tinted ground with no rule */}
+      <header className="h-12 px-4 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm tracking-tight">HOTELYO HQ</span>
+            <span className="text-[11px] text-[#5d5f60] px-1.5 py-0.5 bg-[#ebedee] rounded">
+              Platform administration
+            </span>
           </div>
 
-          <div className="hidden lg:flex items-center gap-3 pl-4 border-l border-slate-800/80 text-sm">
-            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200">
-              <span className="material-symbols-outlined text-amber-400 text-lg">domain</span>
-              <span className="font-medium text-xs">All Properties: Goa Anjuna, Leh Ladakh, Manali Hub</span>
-              <span className="px-1.5 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">
-                3 Hubs Active
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono">
-              <span className="material-symbols-outlined text-slate-400 text-base">calendar_month</span>
-              <span>November 2026</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            </div>
-
-            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs font-mono text-slate-300">
-              <span className="text-amber-400 font-bold">₹</span>
-              <span>INR (₹)</span>
-            </div>
-          </div>
+          {/* Property Hub Selector */}
+          <select
+            value={selectedHub}
+            onChange={(e) => setSelectedHub(e.target.value)}
+            className="px-2.5 py-1 text-xs border border-[#e8eaec] bg-white rounded-md text-[#131416]"
+          >
+            <option value="Goa Vagator Hub">Goa Vagator Hub (48 beds)</option>
+            <option value="Manali Old Village Hub">Manali Old Village Hub (36 beds)</option>
+            <option value="Leh Fort Road Hub">Leh Fort Road Hub (28 beds)</option>
+          </select>
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-rose-950/40 border border-rose-800/50 text-rose-400 hover:bg-rose-900/40 text-xs font-headline font-bold uppercase tracking-wider">
-            <span className="material-symbols-outlined text-rose-400 text-base animate-pulse">lock_person</span>
-            <span>Emergency Lockout</span>
-          </button>
-
-          <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-xs">
-              RK
-            </div>
-            <div className="hidden xl:block text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-200">Rakshith</span>
-                <span className="material-symbols-outlined text-[13px] text-amber-400" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  verified
-                </span>
-              </div>
-              <p className="text-[10px] font-mono text-slate-500">HQ Principal</p>
-            </div>
+          <div className="hidden sm:flex items-center gap-2 text-[#5d5f60]">
+            <span>{adminUser.name}</span>
+            <span className="text-[#1b6c80]">{adminUser.email}</span>
           </div>
+          <button
+            onClick={() => setAdminUser(null)}
+            className="text-xs text-[#c4242a] hover:underline"
+          >
+            Sign out
+          </button>
         </div>
       </header>
 
-      {/* Main Shell */}
-      <div className="flex pt-16 min-h-screen">
-        {/* Sidebar */}
-        <aside className="fixed left-0 top-0 h-screen w-64 pt-16 flex flex-col justify-between p-4 z-40 border-r border-slate-800/80 backdrop-blur-md bg-slate-950/95 shadow-xl hidden md:flex">
-          <div className="space-y-6">
-            <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <span className="material-symbols-outlined text-xl">shield</span>
-              </div>
-              <div>
-                <h4 className="font-display text-xs font-bold text-slate-100 uppercase tracking-tight">MotoNomad HQ</h4>
-                <p className="text-[11px] font-mono text-slate-400">Central Control 01</p>
-              </div>
-            </div>
-
-            <nav className="space-y-1">
-              <p className="px-3 pb-2 text-[10px] font-mono uppercase tracking-widest text-slate-400">HQ Operations Core</p>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 font-semibold text-sm" href="#">
-                <span className="material-symbols-outlined text-xl">analytics</span>
-                <span>Portfolio Metrics</span>
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-900/60 font-medium text-sm transition-colors" href="#policy-controller">
-                <span className="material-symbols-outlined text-xl">policy</span>
-                <span>Policy Controller</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-900/60 font-medium text-sm transition-colors" href="#reservations-ledger">
-                <span className="material-symbols-outlined text-xl">account_balance</span>
-                <span>Financial Ledger</span>
-                <span className="ml-auto px-1.5 py-0.5 text-[9px] font-mono bg-slate-800 text-slate-300 rounded">114 beds</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-900/60 font-medium text-sm transition-colors" href="#audit-log">
-                <span className="material-symbols-outlined text-xl">receipt_long</span>
-                <span>Live Audit Stream</span>
-                <span className="ml-auto flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-              </a>
-            </nav>
-          </div>
-
-          <div className="pt-4 border-t border-slate-800/80 space-y-2">
-            <div className="px-3 py-2 rounded-md bg-slate-950 border border-slate-900 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-              <span>SEC-LAYER: L3-V4</span>
-              <span className="text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> SYNCED
-              </span>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <main className="flex-1 md:ml-64 p-6 lg:p-8 space-y-8 max-w-[1720px] mx-auto overflow-x-hidden">
-          {/* Executive Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800/60">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-headline font-bold text-2xl lg:text-3xl text-slate-50 tracking-tight">
-                  Executive Operations & Yield Matrix
-                </h1>
-                <span className="px-2 py-0.5 text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded font-semibold">
-                  LIVE Q4-2026
-                </span>
-              </div>
-              <p className="text-xs lg:text-sm text-slate-400 mt-1">
-                Real-time multi-property telemetry across Goa Anjuna, Leh Ladakh & Manali Hubs. Moto-nomad priority locking engaged.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => alert('Exporting full GST ledger CSV/PDF...')}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-base text-amber-400">file_download</span>
-                <span>Export Executive Snapshot</span>
+      {/* Sheet inset from edges */}
+      <div className="flex-1 p-2 pt-0">
+        <div className="bg-white border border-[#e8eaec] rounded-2xl min-h-[calc(100vh-56px)] p-6 space-y-6">
+          {/* Notification banner */}
+          {statusNotification && (
+            <div className="p-3 text-xs bg-[#dcfae5] text-[#04250e] rounded-md flex items-center justify-between">
+              <span>{statusNotification}</span>
+              <button onClick={() => setStatusNotification('')} className="font-medium underline ml-2">
+                Dismiss
               </button>
             </div>
+          )}
+
+          {/* Underline Tabs */}
+          <div className="border-b border-[#f0f1f2] flex items-center gap-6 text-xs">
+            {[
+              { id: 'overview', label: 'Overview and metrics' },
+              { id: 'allocation', label: 'Motorcyclist bed allocation' },
+              { id: 'pricing', label: 'Dynamic pricing engine' },
+              { id: 'vendors', label: 'Vendor procurement' },
+              { id: 'ledger', label: 'Institutional ledger' },
+              { id: 'audit', label: 'Audit event stream' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`pb-2.5 transition-colors relative ${
+                  activeTab === tab.id
+                    ? 'text-[#131416] font-semibold after:content-[""] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#1b6c80]'
+                    : 'text-[#5d5f60] hover:text-[#131416]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {/* Executive KPIs Grid (5 Bento Cards) */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-amber-400 text-lg">monitoring</span>
-                <h2 className="font-headline font-bold text-sm uppercase tracking-wider text-slate-300">
-                  Financial & Portfolio Performance Metrics
-                </h2>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400">Timestamp: Live Synced</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-              {/* Card 1: Gross Revenue */}
-              <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                    Total Gross Revenue
-                  </span>
-                  <span className="material-symbols-outlined text-amber-400 text-xl">payments</span>
-                </div>
-                <div className="font-display font-extrabold text-2xl lg:text-3xl text-slate-50 tracking-tight mb-2">
-                  ₹14,82,450
-                </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-[11px]">
-                  <span className="material-symbols-outlined text-xs">trending_up</span>
-                  +18.4% MoM growth
-                </span>
-                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-800 font-mono">
-                  Consolidated Q4 target achieved 109.2%
-                </p>
-              </div>
-
-              {/* Card 2: Blended Occupancy */}
-              <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                    Blended Occupancy
-                  </span>
-                  <span className="material-symbols-outlined text-amber-400 text-xl">hotel</span>
-                </div>
-                <div className="font-display font-extrabold text-2xl lg:text-3xl text-slate-50 tracking-tight mb-2">
-                  86.4% <span className="text-xs font-mono text-slate-400 font-normal">/ 114 beds</span>
-                </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
-                  <div className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full" style={{ width: '86.4%' }}></div>
-                </div>
-                <div className="flex justify-between items-center text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800">
-                  <span>Anj: <strong className="text-emerald-400">92%</strong></span>
-                  <span>Leh: <strong className="text-amber-400">78%</strong></span>
-                  <span>Man: <strong className="text-emerald-400">84%</strong></span>
-                </div>
-              </div>
-
-              {/* Card 3: Motorcyclist Revenue Share */}
-              <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                    Moto Rider Share
-                  </span>
-                  <span className="material-symbols-outlined text-amber-400 text-xl">two_wheeler</span>
-                </div>
-                <div className="font-display font-extrabold text-2xl lg:text-3xl text-amber-400 tracking-tight mb-2">
-                  ₹8,15,300
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 text-[11px]">
-                  <span className="material-symbols-outlined text-xs">verified</span>
-                  55% of gross • 50% quota beat
-                </div>
-                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-800 font-mono">
-                  Moto segment outperforming OTA by 14%
-                </p>
-              </div>
-
-              {/* Card 4: Bike Bay & Locker Ancillary */}
-              <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                    Bay & Locker Yield
-                  </span>
-                  <span className="material-symbols-outlined text-amber-400 text-xl">garage</span>
-                </div>
-                <div className="font-display font-extrabold text-2xl lg:text-3xl text-slate-50 tracking-tight mb-2">
-                  ₹1,62,800
-                </div>
-                <div className="text-xs font-mono text-slate-300 flex items-center justify-between mb-1">
-                  <span>148 bay nights</span>
-                  <span className="text-amber-400">+122 lockers</span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-800 font-mono">
-                  ARPU add-on delta: +₹380/bed-night
-                </p>
-              </div>
-
-              {/* Card 5: Net GST Liability */}
-              <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                    Net GST Liability
-                  </span>
-                  <span className="material-symbols-outlined text-amber-400 text-xl">receipt</span>
-                </div>
-                <div className="font-display font-extrabold text-2xl lg:text-3xl text-slate-50 tracking-tight mb-2">
-                  ₹1,77,894
-                </div>
-                <div className="text-[11px] font-mono text-slate-300 space-y-0.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">CGST 6%:</span>
-                    <span>₹88,947</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">SGST 6%:</span>
-                    <span>₹88,947</span>
-                  </div>
-                </div>
-                <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-semibold">
-                    GSTIN VERIFIED
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400">Filing T-7</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Motorcyclist Reserved Segment Policy Controller */}
-          <section className="rounded-xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl relative overflow-hidden" id="policy-controller">
-            <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500"></div>
-
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-800">
-              <div className="flex items-center gap-3">
-                <span className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                  <span className="material-symbols-outlined text-2xl">tune</span>
-                </span>
+          {/* ========================================================================= */}
+          {/* TAB 1: EXECUTIVE OVERVIEW METRICS                                         */}
+          {/* ========================================================================= */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-headline font-bold text-lg text-slate-100">
-                    Dynamic Moto-Bed Inventory Allocator & Fallback Engine
-                  </h3>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">
-                    Automated rate management & quota allocation matrix for touring motorcyclists.
+                  <h2 className="text-base font-semibold text-[#131416]">Portfolio metrics</h2>
+                  <p className="text-xs text-[#5d5f60]">Real-time operational summary for {selectedHub}</p>
+                </div>
+
+                <div className="flex gap-1 border border-[#e8eaec] rounded-md p-0.5 bg-[#f9fbfc]">
+                  {(['today', '7d', '30d'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setTimeRange(r)}
+                      className={`px-3 py-1 text-xs rounded transition-colors ${
+                        timeRange === r ? 'bg-white font-medium text-[#131416]' : 'text-[#5d5f60]'
+                      }`}
+                    >
+                      {r === 'today' ? 'Today' : r === '7d' ? '7 days' : '30 days'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* KPI Strip */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-1">
+                  <div className="text-xs text-[#5d5f60]">Occupancy rate</div>
+                  <div className="text-2xl font-normal tabular-nums">88.4%</div>
+                  <div className="text-[11px] text-[#1e7b4f]">+6.2% vs previous period</div>
+                </div>
+
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-1">
+                  <div className="text-xs text-[#5d5f60]">Net lodging revenue</div>
+                  <div className="text-2xl font-normal tabular-nums">₹14,28,400</div>
+                  <div className="text-[11px] text-[#1e7b4f]">+14.8% month on month</div>
+                </div>
+
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-1">
+                  <div className="text-xs text-[#5d5f60]">Motorcyclist bed share</div>
+                  <div className="text-2xl font-normal tabular-nums">52.1%</div>
+                  <div className="text-[11px] text-[#5d5f60]">Target baseline 50%</div>
+                </div>
+
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-1">
+                  <div className="text-xs text-[#5d5f60]">Average daily rate (ADR)</div>
+                  <div className="text-2xl font-normal tabular-nums">₹1,120</div>
+                  <div className="text-[11px] text-[#5d5f60]">Blended across bunks and suites</div>
+                </div>
+              </div>
+
+              {/* Multi-Property Portfolio Overview */}
+              <div className="border border-[#e8eaec] rounded-lg p-5 space-y-4">
+                <div className="text-xs font-semibold text-[#131416]">Multi-hub regional distribution</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="text-[#5d5f60] border-b border-[#f0f1f2]">
+                        <th className="pb-2 font-normal">Hub property</th>
+                        <th className="pb-2 font-normal">Total capacity</th>
+                        <th className="pb-2 font-normal">Moto reserved</th>
+                        <th className="pb-2 font-normal">Current occupancy</th>
+                        <th className="pb-2 font-normal text-right">30-day net billing</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f1f2]">
+                      <tr>
+                        <td className="py-3 font-medium">Goa Vagator Hub</td>
+                        <td className="py-3 tabular-nums">48 beds</td>
+                        <td className="py-3 tabular-nums">24 beds (50%)</td>
+                        <td className="py-3 tabular-nums text-[#1e7b4f]">88.4%</td>
+                        <td className="py-3 tabular-nums text-right font-medium">₹14,28,400</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-medium">Manali Old Village Hub</td>
+                        <td className="py-3 tabular-nums">36 beds</td>
+                        <td className="py-3 tabular-nums">18 beds (50%)</td>
+                        <td className="py-3 tabular-nums text-[#1e7b4f]">79.2%</td>
+                        <td className="py-3 tabular-nums text-right font-medium">₹9,84,200</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-medium">Leh Fort Road Hub</td>
+                        <td className="py-3 tabular-nums">28 beds</td>
+                        <td className="py-3 tabular-nums">14 beds (50%)</td>
+                        <td className="py-3 tabular-nums text-[#1e7b4f]">92.0%</td>
+                        <td className="py-3 tabular-nums text-right font-medium">₹11,40,500</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 2: MOTORCYCLIST INVENTORY ALLOCATION POLICY                           */}
+          {/* ========================================================================= */}
+          {activeTab === 'allocation' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#131416]">Motorcyclist inventory allocation</h2>
+                  <p className="text-xs text-[#5d5f60]">Configure reserved bed share and automated 24-hour release rules</p>
+                </div>
+                <button
+                  onClick={() => showNotification(`Policy saved: ${allocationPct}% locked for touring motorcyclists.`)}
+                  className="px-4 py-2 bg-[#131416] hover:bg-[#2c2d30] text-white rounded-md text-xs font-medium transition-colors"
+                >
+                  Save policy configuration
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-5 border border-[#e8eaec] rounded-lg space-y-4">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-[#5d5f60]">Motorcyclist reserved quota</span>
+                    <span className="text-base font-semibold tabular-nums text-[#1b6c80]">{allocationPct}%</span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="10"
+                    max="90"
+                    step="5"
+                    value={allocationPct}
+                    onChange={(e) => setAllocationPct(Number(e.target.value))}
+                    className="w-full accent-[#1b6c80]"
+                  />
+
+                  <div className="flex justify-between text-[11px] text-[#5d5f60]">
+                    <span>10% min</span>
+                    <span>Default: 50%</span>
+                    <span>90% max</span>
+                  </div>
+
+                  <div className="pt-2">
+                    <label className="flex items-center justify-between p-3 border border-[#e8eaec] rounded-md bg-[#f9fbfc] cursor-pointer">
+                      <div className="text-xs">
+                        <span className="font-medium text-[#131416]">24-hour auto-release fallback</span>
+                        <p className="text-[#5d5f60]">Release unsold motorcycle inventory to general guests 24h before check-in</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={autoReleaseEnabled}
+                        onChange={(e) => setAutoReleaseEnabled(e.target.checked)}
+                        className="h-4 w-4 text-[#1b6c80] rounded"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="p-5 border border-[#e8eaec] rounded-lg bg-[#f9fbfc] space-y-4">
+                  <div className="text-xs font-semibold text-[#131416]">
+                    Inventory partition for {selectedHub} ({totalBeds} total beds)
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-white border border-[#e8eaec] rounded-md space-y-1">
+                      <div className="text-xs text-[#5d5f60]">Moto reserved beds</div>
+                      <div className="text-2xl font-normal tabular-nums text-[#1b6c80]">{lockedBeds} beds</div>
+                      <div className="text-[11px] text-[#5d5f60]">{allocationPct}% of total capacity</div>
+                    </div>
+
+                    <div className="p-4 bg-white border border-[#e8eaec] rounded-md space-y-1">
+                      <div className="text-xs text-[#5d5f60]">General public beds</div>
+                      <div className="text-2xl font-normal tabular-nums">{generalBeds} beds</div>
+                      <div className="text-[11px] text-[#5d5f60]">{100 - allocationPct}% of total capacity</div>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-[#5d5f60]">
+                    Beds assigned to motorcyclists include access to secure parking bay and helmet drying lockers.
                   </p>
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="flex items-center gap-3">
-                {policySaved && (
-                  <span className="text-xs text-emerald-400 font-mono font-bold">✓ Policy Saved!</span>
-                )}
+          {/* ========================================================================= */}
+          {/* TAB 3: DYNAMIC PRICING ENGINE (PHASE 1B)                                  */}
+          {/* ========================================================================= */}
+          {activeTab === 'pricing' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#131416]">Dynamic pricing engine</h2>
+                  <p className="text-xs text-[#5d5f60]">Seasonal, weekend, and festival multipliers (Phase 1b)</p>
+                </div>
                 <button
-                  onClick={handleSavePolicy}
-                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-headline font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-md"
+                  onClick={() => showNotification('Dynamic pricing rules updated across all property channels.')}
+                  className="px-4 py-2 bg-[#131416] hover:bg-[#2c2d30] text-white rounded-md text-xs font-medium transition-colors"
                 >
-                  <span className="material-symbols-outlined text-base">save</span>
-                  <span>Save Policy</span>
+                  Save pricing multipliers
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-medium">Weekend surcharge</span>
+                    <span className="tabular-nums font-semibold text-[#1b6c80]">+{weekendSurge}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    value={weekendSurge}
+                    onChange={(e) => setWeekendSurge(Number(e.target.value))}
+                    className="w-full accent-[#1b6c80]"
+                  />
+                  <p className="text-[11px] text-[#5d5f60]">Applies Friday and Saturday nights automatically.</p>
+                </div>
+
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-medium">Monsoon touring discount</span>
+                    <span className="tabular-nums font-semibold text-[#1e7b4f]">-{monsoonDiscount}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="40"
+                    value={monsoonDiscount}
+                    onChange={(e) => setMonsoonDiscount(Number(e.target.value))}
+                    className="w-full accent-[#1b6c80]"
+                  />
+                  <p className="text-[11px] text-[#5d5f60]">Incentivizes wet-weather touring from June to September.</p>
+                </div>
+
+                <div className="p-4 border border-[#e8eaec] rounded-lg space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-medium">Rider festival peak surge</span>
+                    <span className="tabular-nums font-semibold text-[#c4242a]">+{festivalPeakSurge}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="80"
+                    value={festivalPeakSurge}
+                    onChange={(e) => setFestivalPeakSurge(Number(e.target.value))}
+                    className="w-full accent-[#1b6c80]"
+                  />
+                  <p className="text-[11px] text-[#5d5f60]">Applies during Goa moto events (Nov 15-25).</p>
+                </div>
+              </div>
+
+              {/* Rate preview calculation */}
+              <div className="border border-[#e8eaec] rounded-lg p-5 space-y-3 bg-[#f9fbfc]">
+                <div className="text-xs font-semibold text-[#131416]">Computed rate schedule (Base Solo Pod: ₹999/night)</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 bg-white border border-[#e8eaec] rounded">
+                    <div className="text-[#5d5f60]">Weekend rate</div>
+                    <div className="text-lg font-medium tabular-nums">₹{Math.round(999 * (1 + weekendSurge / 100))}</div>
+                    <div className="text-[11px] text-[#5d5f60]">Fri & Sat nights</div>
+                  </div>
+                  <div className="p-3 bg-white border border-[#e8eaec] rounded">
+                    <div className="text-[#5d5f60]">Monsoon rate</div>
+                    <div className="text-lg font-medium tabular-nums">₹{Math.round(999 * (1 - monsoonDiscount / 100))}</div>
+                    <div className="text-[11px] text-[#5d5f60]">Rider off-season pass</div>
+                  </div>
+                  <div className="p-3 bg-white border border-[#e8eaec] rounded">
+                    <div className="text-[#5d5f60]">Festival peak rate</div>
+                    <div className="text-lg font-medium tabular-nums">₹{Math.round(999 * (1 + festivalPeakSurge / 100))}</div>
+                    <div className="text-[11px] text-[#5d5f60]">Special event windows</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 4: VENDOR PROCUREMENT & PURCHASE ORDERS (PHASE 1B)                    */}
+          {/* ========================================================================= */}
+          {activeTab === 'vendors' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#131416]">Vendor purchase orders</h2>
+                  <p className="text-xs text-[#5d5f60]">Outsourced laundry, food commissary, and workshop supplies (Phase 1b)</p>
+                </div>
+              </div>
+
+              <div className="border border-[#e8eaec] rounded-lg overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="text-[#5d5f60] border-b border-[#f0f1f2] bg-[#f9fbfc]">
+                      <th className="p-3 font-normal">PO identifier</th>
+                      <th className="p-3 font-normal">Vendor partner</th>
+                      <th className="p-3 font-normal">Procurement items</th>
+                      <th className="p-3 font-normal">Date</th>
+                      <th className="p-3 font-normal text-right">Amount</th>
+                      <th className="p-3 font-normal">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f0f1f2]">
+                    {purchaseOrders.map((po) => (
+                      <tr key={po.id}>
+                        <td className="p-3 tabular-nums font-medium">{po.id}</td>
+                        <td className="p-3">
+                          <div className="font-medium">{po.vendor}</div>
+                          <div className="text-[11px] text-[#5d5f60]">{po.category}</div>
+                        </td>
+                        <td className="p-3 text-[#5d5f60]">{po.items}</td>
+                        <td className="p-3 text-[#5d5f60]">{po.date}</td>
+                        <td className="p-3 tabular-nums text-right font-medium">₹{po.amount.toLocaleString('en-IN')}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] ${
+                              po.status === 'Delivered'
+                                ? 'bg-[#dcfae5] text-[#04250e]'
+                                : po.status === 'Dispatched'
+                                ? 'bg-[#fffbeb] text-[#92400e]'
+                                : 'bg-[#ebedee] text-[#353736]'
+                            }`}
+                          >
+                            {po.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Create Purchase Order Form */}
+              <div className="p-4 border border-[#e8eaec] rounded-lg bg-[#f9fbfc] space-y-3 text-xs">
+                <div className="font-semibold text-[#131416]">Issue purchase order</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <select
+                    value={newPoVendor}
+                    onChange={(e) => setNewPoVendor(e.target.value)}
+                    className="px-3 py-2 border border-[#e8eaec] rounded-md bg-white text-[#131416]"
+                  >
+                    <option value="Goa Cleaners & Laundry Services">Goa Cleaners & Laundry Services</option>
+                    <option value="Anjuna Organic Bakery Provisions">Anjuna Organic Bakery Provisions</option>
+                    <option value="Motul & Castrol Fluid Supplier">Motul & Castrol Fluid Supplier</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={newPoItems}
+                    onChange={(e) => setNewPoItems(e.target.value)}
+                    placeholder="Items and specifications..."
+                    className="px-3 py-2 border border-[#e8eaec] rounded-md bg-white text-[#131416]"
+                  />
+                  <input
+                    type="number"
+                    value={newPoAmount}
+                    onChange={(e) => setNewPoAmount(e.target.value)}
+                    placeholder="Amount in INR"
+                    className="px-3 py-2 border border-[#e8eaec] rounded-md bg-white text-[#131416] tabular-nums"
+                  />
+                </div>
+                <button
+                  onClick={handleCreatePo}
+                  className="px-4 py-2 bg-[#131416] hover:bg-[#2c2d30] text-white rounded-md font-medium transition-colors"
+                >
+                  Issue purchase order
                 </button>
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6">
-              {/* Slider (7 cols) */}
-              <div className="lg:col-span-7 space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-mono uppercase text-slate-400 font-semibold tracking-wider">
-                      Property Scope Allocation
-                    </span>
-                    <h4 className="font-display font-bold text-slate-200 text-base mt-0.5">
-                      Anjuna Property Motorcycle Bed Allocation
-                    </h4>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-mono text-2xl font-extrabold text-amber-400">{allocationPct}%</span>
-                    <span className="text-[11px] font-mono text-slate-400 block">(Configurable: 30% - 70%)</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <input
-                    type="range"
-                    min="30"
-                    max="70"
-                    value={allocationPct}
-                    onChange={(e) => setAllocationPct(Number(e.target.value))}
-                    className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                  />
-                  <div className="flex justify-between text-[11px] font-mono text-slate-400">
-                    <span>30% Minimum Floor</span>
-                    <span className="text-amber-400 font-semibold">Recommended Target: 45-55%</span>
-                    <span>70% Peak Rally Cap</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800 text-center">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Live Locked Moto Beds</span>
-                    <p className="font-mono text-lg font-bold text-amber-400 mt-0.5">{lockedBeds} of 48 beds</p>
-                    <span className="text-[10px] text-emerald-400 font-mono">19 Pre-booked (79%)</span>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800 text-center">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">General OTA Capacity</span>
-                    <p className="font-mono text-lg font-bold text-slate-200 mt-0.5">{generalBeds} of 48 beds</p>
-                    <span className="text-[10px] text-amber-400 font-mono">22 Pre-booked (91%)</span>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800 text-center">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Secured Bike Bays</span>
-                    <p className="font-mono text-lg font-bold text-slate-200 mt-0.5">18 of 20 bays</p>
-                    <span className="text-[10px] text-rose-400 font-mono">2 Bays remaining</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fallback Switch (5 cols) */}
-              <div className="lg:col-span-5 p-5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between space-y-4">
+          {/* ========================================================================= */}
+          {/* TAB 5: MASTER INSTITUTIONAL LEDGER                                        */}
+          {/* ========================================================================= */}
+          {activeTab === 'ledger' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-base text-emerald-400">autorenew</span>
-                      Automated Yield Fallback
-                    </span>
-                    <span
-                      onClick={() => setAutoReleaseEnabled(!autoReleaseEnabled)}
-                      className={`cursor-pointer px-2 py-0.5 text-[10px] font-mono font-bold rounded-full ${
-                        autoReleaseEnabled
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {autoReleaseEnabled ? 'ENABLED / ACTIVE' : 'DISABLED'}
-                    </span>
-                  </div>
-
-                  <h5 className="text-xs font-semibold text-slate-200">
-                    Auto-release unsold moto beds 24h prior to check-in to general public
-                  </h5>
-                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                    Unclaimed rider slots auto-convert to general OTA inventory at 12:00 PM T-1 day. Prevents vacancy spoilage while ensuring guaranteed inventory for late-night riders.
-                  </p>
+                  <h2 className="text-base font-semibold text-[#131416]">Master institutional ledger</h2>
+                  <p className="text-xs text-[#5d5f60]">Comprehensive booking records, door access codes, and GST compliance</p>
                 </div>
 
-                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-amber-400 text-sm">security</span>
-                    Safety Floor: Minimum 3 emergency rider pods reserved till 18:00 IST
-                  </span>
-                  <span className="text-amber-400 font-semibold">PROTECTED</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Master Reservations & Financial Ledger */}
-          <section className="rounded-xl bg-slate-900/90 border border-slate-800 shadow-xl overflow-hidden" id="reservations-ledger">
-            <div className="p-5 border-b border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-400 text-xl">dataset</span>
-                  <h3 className="font-headline font-bold text-base text-slate-100">
-                    Master Reservations & Financial Ledger
-                  </h3>
-                  <span className="px-2 py-0.5 text-[11px] font-mono bg-slate-800 text-slate-300 rounded font-medium">
-                    {filteredLedger.length} Records Shown
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Real-time ledger with automated GST invoicing, ANPR clearance gates, and keypad PIN dispatch.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative min-w-[240px]">
-                  <span className="material-symbols-outlined text-slate-500 absolute left-3 top-2.5 text-lg">search</span>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search guest, booking ref, bike..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <select
-                  value={selectedProperty}
-                  onChange={(e) => setSelectedProperty(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none"
+                <button
+                  onClick={handleExportCsv}
+                  className="px-4 py-2 bg-[#131416] hover:bg-[#2c2d30] text-white rounded-md text-xs font-medium transition-colors self-start sm:self-auto"
                 >
-                  <option value="All">All Hubs (Goa, Leh, Manali)</option>
-                  <option value="Goa">Goa Anjuna</option>
-                  <option value="Leh">Leh Ladakh</option>
-                  <option value="Manali">Manali Hub</option>
+                  Export CSV (HSN 9963)
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Filter by guest name, bike plate, or booking ref..."
+                  className="flex-1 px-3 py-2 border border-[#e8eaec] rounded-md text-xs text-[#131416] bg-[#f9fbfc]"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-[#e8eaec] rounded-md text-xs text-[#131416] bg-white"
+                >
+                  <option value="All">All statuses</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Checked-In">Checked-In</option>
                 </select>
               </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-950/90 text-slate-400 font-mono uppercase tracking-wider text-[11px] border-b border-slate-800">
-                    <th className="py-3 px-4">Booking Ref</th>
-                    <th className="py-3 px-4">Guest Name & Rider Badge</th>
-                    <th className="py-3 px-4">Property</th>
-                    <th className="py-3 px-4">Room / Bed</th>
-                    <th className="py-3 px-4">Dates</th>
-                    <th className="py-3 px-4">Add-ons</th>
-                    <th className="py-3 px-4">GST Invoice #</th>
-                    <th className="py-3 px-4 text-right">Total INR</th>
-                    <th className="py-3 px-4 text-center">Payment Status</th>
-                    <th className="py-3 px-4">Access PIN & ANPR</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-body">
-                  {filteredLedger.map((row) => (
-                    <tr key={row.ref} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4 font-mono font-bold text-amber-400">{row.ref}</td>
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-100">{row.guest}</div>
-                        <div className="flex items-center gap-1 text-[10px] font-mono text-amber-400/90 mt-0.5">
-                          <span className="material-symbols-outlined text-[12px]">two_wheeler</span>
-                          <span>{row.vehicle}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-medium text-slate-300">{row.property}</td>
-                      <td className="py-3 px-4 font-mono text-slate-300">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">{row.room}</span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-400">{row.dates}</td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
-                          {row.addons}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-400">{row.invoice}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-slate-100 text-right">{row.total}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {row.payment}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-emerald-400 font-semibold">{row.access}</td>
+              <div className="border border-[#e8eaec] rounded-lg overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="text-[#5d5f60] border-b border-[#f0f1f2] bg-[#f9fbfc]">
+                      <th className="p-3 font-normal">Reference</th>
+                      <th className="p-3 font-normal">Guest and motorcycle</th>
+                      <th className="p-3 font-normal">Hub and unit</th>
+                      <th className="p-3 font-normal">Stay dates</th>
+                      <th className="p-3 font-normal">Tax invoice</th>
+                      <th className="p-3 font-normal text-right">Net billing</th>
+                      <th className="p-3 font-normal">Door PIN</th>
+                      <th className="p-3 font-normal">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#f0f1f2]">
+                    {filteredLedger.map((row) => (
+                      <tr key={row.ref}>
+                        <td className="p-3 tabular-nums font-medium">{row.ref}</td>
+                        <td className="p-3">
+                          <div className="font-medium">{row.guest}</div>
+                          <div className="text-[11px] text-[#5d5f60]">{row.bike}</div>
+                        </td>
+                        <td className="p-3">
+                          <div>{row.hub}</div>
+                          <div className="text-[11px] text-[#1b6c80] font-medium">{row.room}</div>
+                        </td>
+                        <td className="p-3 text-[#5d5f60]">{row.dates}</td>
+                        <td className="p-3 tabular-nums text-[#5d5f60]">{row.invoice}</td>
+                        <td className="p-3 tabular-nums text-right font-medium">₹{row.total.toLocaleString('en-IN')}</td>
+                        <td className="p-3 tabular-nums font-semibold text-[#1b6c80]">{row.access}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] ${
+                              row.status === 'Checked-In'
+                                ? 'bg-[#dcfae5] text-[#04250e]'
+                                : 'bg-[#fffbeb] text-[#92400e]'
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </section>
+          )}
 
-          {/* Cryptographic SHA-256 Audit Log */}
-          <section className="rounded-xl bg-slate-900/90 border border-slate-800 p-5 shadow-xl space-y-3" id="audit-log">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-amber-400">lock</span>
-                <h3 className="font-headline font-bold text-sm text-slate-100 uppercase tracking-wider">
-                  Tamper-Proof Audit Trail (SHA-256)
-                </h3>
+          {/* ========================================================================= */}
+          {/* TAB 6: CRYPTOGRAPHIC SHA-256 AUDIT STREAM                                 */}
+          {/* ========================================================================= */}
+          {activeTab === 'audit' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-base font-semibold text-[#131416]">Audit event stream</h2>
+                <p className="text-xs text-[#5d5f60]">Cryptographically linked event records for door codes, folios, and day-close audits</p>
               </div>
-              <span className="text-[10px] font-mono text-emerald-400">Zero Unverified Mutations</span>
-            </div>
 
-            <div className="space-y-2 font-mono text-xs">
-              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-amber-400">[14:32:08 IST]</span> Actor:{' '}
-                  <strong className="text-white">Admin: Rakshith (HQ)</strong> • Policy threshold set to {allocationPct}%
-                </div>
-                <span className="text-slate-500 text-[10px]">0x8f4c...3b12</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-amber-400">[14:15:22 IST]</span> Actor:{' '}
-                  <strong className="text-white">ANPR Gateway Node #1</strong> • Gate barrier clearance for MH 12 QX 4040
-                </div>
-                <span className="text-slate-500 text-[10px]">0x1d9e...a409</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-amber-400">[13:58:40 IST]</span> Actor:{' '}
-                  <strong className="text-white">UPI Gateway Webhook</strong> • Payment settled ₹3,493 (Inv: INV-2026-8841)
-                </div>
-                <span className="text-slate-500 text-[10px]">0x6a12...77fe</span>
+              <div className="space-y-3 text-xs">
+                {[
+                  {
+                    event: 'ACCESS_CODE_PROVISIONED',
+                    actor: 'system:anpr_gate',
+                    hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                    details: 'Issued PIN 8492# for Pod 101-A2 (Guest: Arjun Singhania, Plate: GA 03 AB 4092)',
+                    time: '14 Nov 2026 14:02:11 IST',
+                  },
+                  {
+                    event: 'FOLIO_SETTLED_UPI',
+                    actor: 'gateway:hdfc_upi',
+                    hash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4',
+                    details: 'Received ₹3,469 via VPA hotelyo@okhdfcbank for Invoice INV-2026-8841',
+                    time: '14 Nov 2026 13:58:44 IST',
+                  },
+                  {
+                    event: 'POLICY_REALLOCATION',
+                    actor: 'admin:siddharth',
+                    hash: 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e',
+                    details: 'Locked 50% inventory (24 beds) for touring motorcyclists with 24h auto-release fallback',
+                    time: '14 Nov 2026 11:20:05 IST',
+                  },
+                  {
+                    event: 'DAY_CLOSE_COMMITTED',
+                    actor: 'pms:duty_manager',
+                    hash: 'c24b6b77ecb0147e4cb7910ff61c6b12d59187ec9ffec448c2668582f34714d2',
+                    details: 'Night audit completed. Total Revenue: ₹56,772. Zero folio discrepancy.',
+                    time: '14 Nov 2026 04:00:00 IST',
+                  },
+                ].map((ev, idx) => (
+                  <div key={idx} className="p-4 border border-[#e8eaec] rounded-lg bg-[#f9fbfc] space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-[#1b6c80]">{ev.event}</span>
+                      <span className="text-[11px] text-[#5d5f60]">{ev.time}</span>
+                    </div>
+                    <p className="text-[#131416] text-xs">{ev.details}</p>
+                    <div className="text-[11px] text-[#5d5f60] truncate">
+                      SHA-256: <span className="tabular-nums font-mono">{ev.hash}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </section>
-        </main>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -41,3 +41,7 @@ test-results/
 # Temporary / scratch
 tmp/
 .turbo/
+.tools/
+.agents/
+.hallmark/
+.taste-skill/

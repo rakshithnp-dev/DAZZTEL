@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from './common/prisma.service';
+import { IamModule } from './modules/iam/iam.module';
 import { PropertyModule } from './modules/property/property.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { BookingModule } from './modules/booking/booking.module';
@@ -8,6 +9,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
+    IamModule,
     PropertyModule,
     AvailabilityModule,
     BookingModule,

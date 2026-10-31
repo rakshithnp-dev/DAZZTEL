@@ -2,681 +2,763 @@
 
 import React, { useState } from 'react';
 
-export default function StaffPmsDashboard() {
-  // Front-Desk OTP Verification
-  const [otpDigits, setOtpDigits] = useState(['8', '4', '9', '2', '', '']);
-  const [guestCheckedIn, setGuestCheckedIn] = useState(false);
-  const [accessCode, setAccessCode] = useState('8492#');
-  const [codeRevoked, setCodeRevoked] = useState(false);
-  const [dayCloseDone, setDayCloseDone] = useState(false);
+interface StaffUser {
+  name: string;
+  email: string;
+  role: 'FRONT_DESK' | 'HOUSEKEEPING' | 'DUTY_MANAGER';
+  shift: string;
+}
 
-  // Housekeeping task queue state
-  const [tasks, setTasks] = useState([
-    { id: '101-A3', bed: 'Bed 101-A3', guest: 'Rohan D.', time: '11:30 AM', priority: 'High', status: 'Dirty', staff: 'Ramesh K.' },
-    { id: '102-B1', bed: 'Bed 102-B1', guest: 'Priya M.', time: '10:45 AM', priority: 'Med', status: 'Cleaning', staff: 'Sunita B.' },
-    { id: '104-A2', bed: 'Bed 104-A2', guest: 'Dev N.', time: '09:15 AM', priority: 'Normal', status: 'Inspected', staff: 'Ramesh K.' },
-    { id: '105-B4', bed: 'Bed 105-B4', guest: 'Sameer P.', time: '08:30 AM', priority: 'Rush', status: 'Ready', staff: 'Sunita B.' },
+interface GuestArrival {
+  id: string;
+  name: string;
+  ref: string;
+  room: string;
+  bike: string;
+  otp: string;
+  status: 'Arriving' | 'Checked-In' | 'Departed';
+  keycode: string;
+  balance: number;
+}
+
+interface FolioItem {
+  id: string;
+  desc: string;
+  amount: number;
+  type: 'STAY' | 'ADDON' | 'CAFE' | 'LAUNDRY' | 'TAX';
+}
+
+export default function StaffPmsPage() {
+  const [staffUser, setStaffUser] = useState<StaffUser | null>({
+    name: 'Vikram Joshi',
+    email: 'frontdesk@hotelyo.com',
+    role: 'FRONT_DESK',
+    shift: 'Morning shift (06:00 - 14:00)',
+  });
+
+  const [loginEmail, setLoginEmail] = useState('frontdesk@hotelyo.com');
+  const [loginPin, setLoginPin] = useState('1234');
+
+  const [activeTab, setActiveTab] = useState<'arrivals' | 'tape' | 'folios' | 'housekeeping' | 'handover' | 'lostfound' | 'dayclose'>('arrivals');
+
+  const [arrivals, setArrivals] = useState<GuestArrival[]>([
+    {
+      id: 'g-1',
+      name: 'Arjun Singhania',
+      ref: '#HY-ANJ-9482',
+      room: 'Pod 101-A2',
+      bike: 'RE Himalayan 450 (MH 12 QX 4040)',
+      otp: '849204',
+      status: 'Arriving',
+      keycode: '8492#',
+      balance: 0,
+    },
+    {
+      id: 'g-2',
+      name: 'Vikram Rathore',
+      ref: '#HY-LEH-1049',
+      room: 'Pod 204-B1',
+      bike: 'KTM 390 Adventure (DL 03 AP 9921)',
+      otp: '391055',
+      status: 'Arriving',
+      keycode: '3910#',
+      balance: 450,
+    },
+    {
+      id: 'g-3',
+      name: 'Ananya Sen',
+      ref: '#HY-ANJ-9410',
+      room: 'Suite 102-A',
+      bike: 'BMW G310GS (KA 01 MR 7812)',
+      otp: '110488',
+      status: 'Checked-In',
+      keycode: '1104#',
+      balance: 0,
+    },
   ]);
 
-  const handleAdvanceStatus = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const nextStatus =
-          t.status === 'Dirty' ? 'Cleaning' : t.status === 'Cleaning' ? 'Inspected' : t.status === 'Inspected' ? 'Ready' : 'Clean';
-        return { ...t, status: nextStatus };
-      })
-    );
+  const [otpInput, setOtpInput] = useState('849204');
+  const [selectedGuest, setSelectedGuest] = useState<GuestArrival>(arrivals[0]);
+  const [statusNotification, setStatusNotification] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [folioItems, setFolioItems] = useState<FolioItem[]>([
+    { id: 'f-1', desc: 'Acoustic Solo Bunk (3 nights)', amount: 2547, type: 'STAY' },
+    { id: 'f-2', desc: 'Covered motorcycle bay 04', amount: 450, type: 'ADDON' },
+    { id: 'f-3', desc: '45°C heated gear locker', amount: 300, type: 'ADDON' },
+    { id: 'f-4', desc: 'Cafe: Rider breakfast bowl and cold brew', amount: 440, type: 'CAFE' },
+    { id: 'f-5', desc: 'Self-service laundry cycle', amount: 120, type: 'LAUNDRY' },
+    { id: 'f-6', desc: 'GST @ 12% (HSN 9963: 6% + 6%)', amount: 463, type: 'TAX' },
+  ]);
+  const [newChargeDesc, setNewChargeDesc] = useState('Workshop chain cleaner pass');
+  const [newChargeAmount, setNewChargeAmount] = useState('250');
+  const [splitFolioActive, setSplitFolioActive] = useState(false);
+
+  const [rooms, setRooms] = useState([
+    { id: '101-A1', name: 'Pod 101-A1', type: 'Acoustic Solo Bunk', status: 'Clean' },
+    { id: '101-A2', name: 'Pod 101-A2', type: 'Acoustic Solo Bunk', status: 'Occupied' },
+    { id: '101-A3', name: 'Pod 101-A3', type: 'Acoustic Solo Bunk', status: 'Dirty' },
+    { id: '204-B1', name: 'Pod 204-B1', type: 'Moto En-Suite Pod', status: 'Cleaning' },
+    { id: '204-B2', name: 'Pod 204-B2', type: 'Moto En-Suite Pod', status: 'Clean' },
+    { id: '102-A', name: 'Suite 102-A', type: 'Deluxe Atelier Suite', status: 'Occupied' },
+  ]);
+
+  const [handoverLogs, setHandoverLogs] = useState([
+    {
+      id: 'h-1',
+      shift: 'Morning to evening',
+      author: 'Vikram Joshi',
+      note: 'Guest in Suite 102 requested 05:30 early departure breakfast. Keycode 8492 active for Pod 101-A2.',
+      time: '13:45',
+    },
+    {
+      id: 'h-2',
+      shift: 'Night to morning',
+      author: 'Suresh Patil',
+      note: 'Optical barrier gate camera calibrated. 18 of 20 motorcycle bays occupied overnight. Wash bay compressor at 120 PSI.',
+      time: '05:50',
+    },
+  ]);
+  const [newHandoverNote, setNewHandoverNote] = useState('');
+
+  const [lostItems, setLostItems] = useState([
+    { id: 'lf-1', item: 'Alpinestars Drystar riding gloves (L)', location: 'Wash bay area', status: 'Unclaimed', date: '27 Oct' },
+    { id: 'lf-2', item: 'GoPro Hero 11 dual charger', location: 'Locker 08 vault', status: 'Claimed by Arjun S.', date: '26 Oct' },
+  ]);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemLocation, setNewItemLocation] = useState('');
+
+  const [dayCloseExecuting, setDayCloseExecuting] = useState(false);
+  const [dayCloseCompleted, setDayCloseCompleted] = useState(false);
+
+  const showNotification = (msg: string) => {
+    setStatusNotification(msg);
+    setTimeout(() => setStatusNotification(''), 4000);
+  };
+
+  const handleQuickLogin = (role: 'FRONT_DESK' | 'HOUSEKEEPING' | 'DUTY_MANAGER', name: string, email: string) => {
+    setStaffUser({ name, email, role, shift: 'Morning shift (06:00 - 14:00)' });
   };
 
   const handleVerifyOtp = () => {
-    setGuestCheckedIn(true);
+    if (!selectedGuest) return;
+    setArrivals((prev) =>
+      prev.map((g) => (g.id === selectedGuest.id ? { ...g, status: 'Checked-In' } : g))
+    );
+    setSelectedGuest((prev) => ({ ...prev, status: 'Checked-In' }));
+    showNotification(`OTP verified. Keycode ${selectedGuest.keycode} activated and ANPR barrier gate cleared.`);
   };
 
-  const handleRevokeCode = () => {
-    setCodeRevoked(true);
+  const handleRegenerateKeycode = () => {
+    const newCode = `${Math.floor(1000 + Math.random() * 9000)}#`;
+    setArrivals((prev) =>
+      prev.map((g) => (g.id === selectedGuest.id ? { ...g, keycode: newCode } : g))
+    );
+    setSelectedGuest((prev) => ({ ...prev, keycode: newCode }));
+    showNotification(`Keycode revoked and re-issued: ${newCode}`);
+  };
+
+  const handleAddFolioCharge = () => {
+    if (!newChargeDesc || !newChargeAmount) return;
+    const amt = Number(newChargeAmount);
+    setFolioItems((prev) => [
+      ...prev,
+      { id: `f-${Date.now()}`, desc: newChargeDesc, amount: amt, type: 'CAFE' },
+    ]);
+    setNewChargeDesc('');
+    setNewChargeAmount('');
+    showNotification(`Posted ₹${amt} charge to folio.`);
+  };
+
+  const handleUpdateRoomStatus = (roomId: string, newStatus: string) => {
+    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, status: newStatus } : r)));
+  };
+
+  const handleAddHandover = () => {
+    if (!newHandoverNote) return;
+    setHandoverLogs((prev) => [
+      {
+        id: `h-${Date.now()}`,
+        shift: `${staffUser?.name || 'Staff'} entry`,
+        author: staffUser?.name || 'Staff officer',
+        note: newHandoverNote,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+      ...prev,
+    ]);
+    setNewHandoverNote('');
+    showNotification('Shift handover note saved.');
+  };
+
+  const handleAddLostItem = () => {
+    if (!newItemName || !newItemLocation) return;
+    setLostItems((prev) => [
+      {
+        id: `lf-${Date.now()}`,
+        item: newItemName,
+        location: newItemLocation,
+        status: 'Unclaimed',
+        date: 'Today',
+      },
+      ...prev,
+    ]);
+    setNewItemName('');
+    setNewItemLocation('');
+    showNotification('Item recorded in registry.');
+  };
+
+  const handleExecuteDayClose = () => {
+    setDayCloseExecuting(true);
     setTimeout(() => {
-      setAccessCode('9140#');
-      setCodeRevoked(false);
-    }, 2000);
+      setDayCloseExecuting(false);
+      setDayCloseCompleted(true);
+    }, 1100);
   };
 
-  const handleDayClose = () => {
-    setDayCloseDone(true);
-    setTimeout(() => setDayCloseDone(false), 5000);
-  };
+  const filteredArrivals = arrivals.filter(
+    (g) =>
+      g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.ref.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.bike.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  return (
-    <div className="bg-slate-950 text-slate-100 font-body min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-slate-950">
-      {/* Top Navigation Bar */}
-      <header className="w-full px-6 py-3 flex items-center justify-between sticky top-0 z-50 backdrop-blur-md bg-slate-950/90 shadow-2xl border-b border-slate-800/80">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500">
-              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                two_wheeler
-              </span>
+  const totalFolioAmount = folioItems.reduce((acc, f) => acc + f.amount, 0);
+
+  // AUTHENTICATION SCREEN
+  if (!staffUser) {
+    return (
+      <div className="min-h-screen bg-[#f9fbfc] flex items-center justify-center p-6 text-xs text-[#131416]">
+        <div className="w-full max-w-sm bg-white border border-[#e8eaec] rounded p-8 space-y-6">
+          <div>
+            <h1 className="text-xl font-normal text-[#131416]">HOTELYO PMS</h1>
+            <p className="text-[#5d5f60] mt-1">Staff front-desk authentication portal</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[#5d5f60] mb-1">Staff email</label>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-[#cdced1] rounded text-[#131416] text-sm"
+              />
             </div>
             <div>
-              <span className="font-headline text-lg font-black tracking-widest text-amber-500">HOTELYO PMS</span>
-              <span className="block text-[10px] font-label font-bold tracking-wider text-slate-400 uppercase leading-none">
-                Moto Hub System
-              </span>
+              <label className="block text-[#5d5f60] mb-1">Security PIN</label>
+              <input
+                type="password"
+                value={loginPin}
+                onChange={(e) => setLoginPin(e.target.value)}
+                className="w-full px-3 py-2 border border-[#cdced1] rounded text-[#131416] text-sm"
+              />
             </div>
+            <button
+              onClick={() => handleQuickLogin('FRONT_DESK', 'Vikram Joshi', loginEmail)}
+              className="w-full py-2 bg-[#131416] text-white rounded font-medium hover:bg-neutral-800"
+            >
+              Sign in to console
+            </button>
           </div>
 
-          <div className="h-5 w-px bg-slate-800"></div>
-
-          {/* Property Switcher */}
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-200">
-            <span className="material-symbols-outlined text-sm text-amber-400">location_on</span>
-            <span>HOTELYO Anjuna, Goa (Hub 01)</span>
-          </button>
-
-          {/* Live Status Pill */}
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[11px] font-medium text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
-            <span className="font-mono font-semibold">Online • 84% Occupancy</span>
+          <div className="border-t border-[#f0f1f2] pt-4 space-y-2">
+            <span className="text-[#5d5f60] block">Quick role sign-in</span>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => handleQuickLogin('FRONT_DESK', 'Vikram Joshi', 'frontdesk@hotelyo.com')}
+                className="p-2 border border-[#e8eaec] rounded text-left hover:bg-[#f4f6f8]"
+              >
+                <div className="font-medium text-[#131416]">Front desk</div>
+                <div className="text-[10px] text-[#5d5f60]">Vikram J.</div>
+              </button>
+              <button
+                onClick={() => handleQuickLogin('HOUSEKEEPING', 'Sunita Rao', 'housekeeping@hotelyo.com')}
+                className="p-2 border border-[#e8eaec] rounded text-left hover:bg-[#f4f6f8]"
+              >
+                <div className="font-medium text-[#131416]">Housekeeper</div>
+                <div className="text-[10px] text-[#5d5f60]">Sunita R.</div>
+              </button>
+              <button
+                onClick={() => handleQuickLogin('DUTY_MANAGER', 'Captain Rao', 'manager@hotelyo.com')}
+                className="p-2 border border-[#e8eaec] rounded text-left hover:bg-[#f4f6f8]"
+              >
+                <div className="font-medium text-[#131416]">Duty manager</div>
+                <div className="text-[10px] text-[#5d5f60]">Capt. Rao</div>
+              </button>
+            </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Global Search */}
-        <div className="flex-1 max-w-md mx-6">
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Search guest, booking ID, bike reg (e.g. MH 12)..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-4 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-            />
+  // FRAMED SHEET APP SHELL
+  return (
+    <div className="min-h-screen bg-[#f9fbfc] p-2 flex flex-col text-[#131416] font-sans">
+      {/* 48px TOP CHROME BAR */}
+      <header className="h-12 px-4 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#131416]">HOTELYO PMS</span>
+            <span className="text-[#5d5f60]">Anjuna Atelier</span>
           </div>
+
+          <nav className="flex items-center gap-1">
+            {[
+              { id: 'arrivals', label: 'Arrivals & OTP' },
+              { id: 'tape', label: 'Tape chart' },
+              { id: 'folios', label: 'Folios & billing' },
+              { id: 'housekeeping', label: 'Housekeeping' },
+              { id: 'handover', label: 'Shift handover' },
+              { id: 'lostfound', label: 'Lost & found' },
+              { id: 'dayclose', label: 'Day close' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id as any)}
+                className={`px-3 py-1.5 rounded transition-colors ${
+                  activeTab === t.id
+                    ? 'text-[#131416] font-semibold border-b-2 border-[#131416]'
+                    : 'text-[#5d5f60] hover:text-[#131416]'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-3.5">
-          <button className="animate-sos flex items-center gap-2 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-headline text-xs font-bold uppercase tracking-wider">
-            <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
-              emergency_home
-            </span>
-            <span>SOS Broadcast</span>
+        <div className="flex items-center gap-4 text-[#5d5f60]">
+          <span>{staffUser.name} ({staffUser.role})</span>
+          <span>{staffUser.shift}</span>
+          <button onClick={() => setStaffUser(null)} className="text-[#c4242a] hover:underline">
+            Sign out
           </button>
-
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-xs">
-              VS
-            </div>
-            <div className="text-left">
-              <div className="text-xs font-semibold text-slate-200">Vikram S.</div>
-              <div className="text-[10px] text-amber-500 font-mono">Front Desk • Shift 1</div>
-            </div>
-          </div>
         </div>
       </header>
 
-      {/* Secondary Bar */}
-      <nav className="bg-slate-950/70 border-b border-slate-900 px-6 py-2 flex items-center justify-between text-xs font-headline font-semibold uppercase tracking-wider">
-        <div className="flex items-center gap-6">
-          <span className="text-amber-400 font-bold border-b-2 border-amber-400 pb-1 flex items-center gap-1.5 cursor-pointer">
-            <span className="material-symbols-outlined text-sm">dashboard</span> Dashboard
-          </span>
-          <span className="text-slate-400 hover:text-slate-200 pb-1 flex items-center gap-1.5 cursor-pointer">
-            <span className="material-symbols-outlined text-sm">bed</span> Beds & Lockers
-          </span>
-          <span className="text-slate-400 hover:text-slate-200 pb-1 flex items-center gap-1.5 cursor-pointer">
-            <span className="material-symbols-outlined text-sm">two_wheeler</span> Wash Bay
-          </span>
-        </div>
-        <div className="flex items-center gap-3 text-slate-400 font-mono text-[11px]">
-          <span className="flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Gate ANPR: MH-ACTIVE
-          </span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400"></span> Locker Hub: 45°C Dry Mode
-          </span>
-        </div>
-      </nav>
-
-      {/* Main Canvas */}
-      <main className="flex-1 p-6 space-y-6 max-w-[1720px] mx-auto w-full">
-        {/* KPI Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-label uppercase tracking-wider font-semibold">
-              <span>Total In-House</span>
-              <span className="material-symbols-outlined text-amber-500 text-xl">groups</span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-3">
-              <div className="text-3xl font-headline font-bold text-white tracking-tight">
-                38 <span className="text-sm font-normal text-slate-400">Guests</span>
-              </div>
-              <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full">
-                92% Cap
-              </span>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-amber-400 font-mono flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-sm">two_wheeler</span>
-              <span>62% touring riders (24 bikes)</span>
-            </div>
+      {/* WHITE WORK SHEET INSET */}
+      <main className="flex-1 bg-white border border-[#e8eaec] rounded-2xl p-6 space-y-6">
+        {statusNotification && (
+          <div className="p-3 bg-[#dcfae5] text-[#04250e] border border-[#b8f5cb] rounded text-xs">
+            {statusNotification}
           </div>
+        )}
 
-          <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-label uppercase tracking-wider font-semibold">
-              <span>Today's Arrivals</span>
-              <span className="material-symbols-outlined text-amber-500 text-xl">luggage</span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-3">
-              <div className="text-3xl font-headline font-bold text-white tracking-tight">
-                14 <span className="text-sm font-normal text-slate-400">Check-ins</span>
-              </div>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded uppercase font-headline">
-                Shift target
-              </span>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-300 font-mono">
-              <span className="text-emerald-400 font-semibold">8 verified</span> •{' '}
-              <span className="text-amber-400 font-semibold">6 pending OTP</span>
-            </div>
-          </div>
-
-          <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-label uppercase tracking-wider font-semibold">
-              <span>Departures</span>
-              <span className="material-symbols-outlined text-rose-500 text-xl">logout</span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-3">
-              <div className="text-3xl font-headline font-bold text-white tracking-tight">
-                9 <span className="text-sm font-normal text-slate-400">Pending Out</span>
-              </div>
-              <span className="px-2 py-0.5 text-[11px] font-medium bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full font-mono">
-                By 12:00
-              </span>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-300 font-label">
-              5 locker stored • 4 keys handed
-            </div>
-          </div>
-
-          <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-label uppercase tracking-wider font-semibold">
-              <span>Housekeeping & Beds</span>
-              <span className="material-symbols-outlined text-amber-500 text-xl">cleaning_services</span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-3">
-              <div className="text-3xl font-headline font-bold text-white tracking-tight">
-                12 <span className="text-sm font-normal text-slate-400">Active Beds</span>
-              </div>
-              <span className="px-2 py-0.5 text-[11px] font-mono text-slate-300 bg-slate-800 rounded">Floor 1</span>
-            </div>
-            <div className="mt-3 grid grid-cols-4 gap-1 text-[11px] pt-3 border-t border-slate-800 text-center font-mono">
-              <div className="bg-emerald-950/40 text-emerald-400 rounded py-0.5 border border-emerald-500/20">4 Cln</div>
-              <div className="bg-rose-950/40 text-rose-400 rounded py-0.5 border border-rose-500/20">3 Drt</div>
-              <div className="bg-slate-800 text-slate-300 rounded py-0.5 border border-slate-700">1 Insp</div>
-              <div className="bg-amber-950/40 text-amber-400 rounded py-0.5 border border-amber-500/20">4 Occ</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Two-Column Grid: 70% Left, 30% Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column (8 cols) */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* Room 101 Bed Matrix Grid */}
-            <section className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-2xl">
-              <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                    <span className="material-symbols-outlined text-lg">meeting_room</span>
-                  </div>
-                  <div>
-                    <h2 className="font-headline text-base font-bold text-white tracking-wide">
-                      Room 101: 6-Bed AC Moto Dorm
-                    </h2>
-                    <div className="text-xs text-slate-400 font-label">
-                      Ground Floor • Heavy-Baggage Access • Dual Keypad Entry
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="px-3 py-1 rounded-md text-xs font-semibold bg-amber-500 text-slate-950">All Beds</span>
-                  <span className="px-3 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300">Occupied (2)</span>
-                  <span className="px-3 py-1 rounded-md text-xs font-medium bg-slate-800 text-amber-400">Moto Reserved (2)</span>
-                </div>
-              </div>
-
-              {/* 6 Bed Cards Grid */}
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-                {/* Bed A1 */}
-                <div className="p-4 rounded-lg bg-slate-950/80 border border-emerald-500/40">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-headline font-bold text-sm text-white">
-                        Bed A1 <span className="text-[11px] font-normal text-slate-400 font-label">• Lower Bunk</span>
-                      </div>
-                      <div className="text-xs font-semibold text-slate-200 mt-1">Kabir Mehta</div>
-                      <div className="text-[11px] text-slate-400 font-mono">KTM 390 Adv (MH 02)</div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 uppercase">
-                      Occupied
-                    </span>
-                  </div>
-                  <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex flex-wrap gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">Slot #02</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">Locker #01</span>
-                  </div>
-                </div>
-
-                {/* Bed A2 (Arjun Singhania) */}
-                <div className="p-4 rounded-lg bg-slate-950/80 border-2 border-amber-500/70 shadow-md shadow-amber-950/30">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-headline font-bold text-sm text-white">
-                        Bed A2 <span className="text-[11px] font-normal text-slate-400 font-label">• Upper Bunk</span>
-                      </div>
-                      <div className="text-xs font-semibold text-amber-300 mt-1">Arjun Singhania</div>
-                      <div className="text-[11px] text-slate-400 font-mono">RE Himalayan 450</div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/50 uppercase animate-pulse">
-                      {guestCheckedIn ? 'Checked-In' : 'Arriving'}
-                    </span>
-                  </div>
-                  <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                    <div className="flex gap-1">
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">Slot #04</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">Locker #07</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-amber-400 font-mono">OTP Pending</span>
-                  </div>
-                </div>
-
-                {/* Bed A3 (Dirty) */}
-                <div className="p-4 rounded-lg bg-slate-950/80 border border-rose-500/50">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-headline font-bold text-sm text-white">
-                        Bed A3 <span className="text-[11px] font-normal text-slate-400 font-label">• Lower Bunk</span>
-                      </div>
-                      <div className="text-xs text-rose-300 mt-1">Previous: Rohan D.</div>
-                      <div className="text-[11px] text-slate-400 font-mono">Out at 11:30 AM</div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 uppercase">
-                      Needs Linen
-                    </span>
-                  </div>
-                  <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-950/50 text-rose-400">
-                      Housekeeping Priority
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bed B1 (Moto Reserved) */}
-                <div className="p-4 rounded-lg bg-slate-950/80 border border-amber-600/40">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-headline font-bold text-sm text-white">
-                        Bed B1 <span className="text-[11px] font-normal text-slate-400 font-label">• Upper Bunk</span>
-                      </div>
-                      <div className="text-xs font-semibold text-slate-300 mt-1">Touring Group Res.</div>
-                      <div className="text-[11px] text-slate-400 font-mono">ETA 18:00 IST</div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-600/20 text-amber-500 border border-amber-600/40 uppercase">
-                      Moto Reserved
-                    </span>
-                  </div>
-                  <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">
-                      Paddock Stand Reserved
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bed B2 (Clean Ready) */}
-                <div className="p-4 rounded-lg bg-slate-950/80 border border-emerald-500/30">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-headline font-bold text-sm text-white">
-                        Bed B2 <span className="text-[11px] font-normal text-slate-400 font-label">• Lower Bunk</span>
-                      </div>
-                      <div className="text-xs font-semibold text-emerald-400 mt-1">Ready for Walk-in</div>
-                      <div className="text-[11px] text-slate-400 font-mono">Inspected 12:15 PM</div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 uppercase">
-                      Clean Ready
-                    </span>
-                  </div>
-                  <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">Instant Walk-in Ready</span>
-                  </div>
-                </div>
-
-                {/* Bed B3 (Inspecting) */}
-                <div className="p-4 rounded-lg bg-slate-950/80 border border-slate-700/60">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-headline font-bold text-sm text-slate-300">
-                        Bed B3 <span className="text-[11px] font-normal text-slate-400 font-label">• Upper Bunk</span>
-                      </div>
-                      <div className="text-xs text-slate-400 mt-1">AC Filter Cleaning</div>
-                      <div className="text-[11px] text-slate-500 font-mono">Work order #402</div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700 uppercase">
-                      Inspecting
-                    </span>
-                  </div>
-                  <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">Technician on-site</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Housekeeping Task Queue */}
-            <section className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-500">cleaning_services</span>
-                  <h3 className="font-headline text-sm font-bold text-white uppercase tracking-wider">
-                    Immediate Housekeeping Task Queue
-                  </h3>
-                </div>
-                <span className="text-xs text-slate-400 font-mono">Floor 1 & 2 Turnover</span>
-              </div>
-
-              <div className="overflow-x-auto mt-3">
-                <table className="w-full text-left text-xs font-label">
-                  <thead>
-                    <tr className="text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800/80">
-                      <th className="py-2.5 px-3">Bed / Unit</th>
-                      <th className="py-2.5 px-3">Guest Out</th>
-                      <th className="py-2.5 px-3">Priority</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Assigned Staff</th>
-                      <th className="py-2.5 px-3 text-right">Quick Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-body">
-                    {tasks.map((task) => (
-                      <tr key={task.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-3 font-headline font-bold text-white">{task.bed}</td>
-                        <td className="py-3 px-3 text-slate-300">
-                          {task.guest} <span className="text-[10px] text-slate-500 font-mono">({task.time})</span>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              task.priority === 'High' || task.priority === 'Rush'
-                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                : 'bg-slate-800 text-slate-300'
-                            }`}
-                          >
-                            {task.priority}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                              task.status === 'Dirty'
-                                ? 'bg-rose-950/60 text-rose-400 border border-rose-800'
-                                : task.status === 'Cleaning'
-                                ? 'bg-amber-950/60 text-amber-400 border border-amber-800'
-                                : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
-                            }`}
-                          >
-                            {task.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-300">{task.staff}</td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            onClick={() => handleAdvanceStatus(task.id)}
-                            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-slate-950 font-semibold text-[11px] transition-all"
-                          >
-                            Advance Status →
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
-
-          {/* Right Column (4 cols) */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* Quick Guest Arrival Verification Panel */}
-            <section className="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/50 rounded-xl p-5 shadow-2xl relative overflow-hidden">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-400 text-xl">bolt</span>
-                  <h3 className="font-headline text-sm font-bold text-white uppercase tracking-wider">
-                    Quick Guest Arrival Verification
-                  </h3>
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Gate ANPR Match
+        {/* TAB 1: ARRIVALS & OTP */}
+        {activeTab === 'arrivals' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-base font-medium text-[#131416]">Today arrivals</h2>
+                <span className="font-mono text-[#5d5f60]">
+                  {arrivals.filter((a) => a.status === 'Arriving').length} pending
                 </span>
               </div>
 
-              {/* Guest Profile */}
-              <div className="mt-4 p-3.5 rounded-lg bg-slate-950/80 border border-slate-800">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-500 font-label">
-                      Guest Profile
-                    </span>
-                    <h4 className="font-headline text-base font-bold text-white">Arjun Singhania</h4>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 font-mono">Booking ID</span>
-                    <div className="text-xs font-bold text-slate-200 font-mono">#HY-ANJ-9482</div>
-                  </div>
-                </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search guest or plate..."
+                className="w-full px-3 py-1.5 border border-[#cdced1] rounded bg-white text-[#131416]"
+              />
 
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-800">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Vehicle Detected</span>
-                    <div className="font-medium text-slate-200 truncate">RE Himalayan 450</div>
-                    <div className="text-[10px] text-amber-400 font-mono">Kamet White • MH 12 QX 4040</div>
+              <div className="space-y-2">
+                {filteredArrivals.map((g) => (
+                  <div
+                    key={g.id}
+                    onClick={() => { setSelectedGuest(g); setOtpInput(g.otp); }}
+                    className={`p-3 border rounded cursor-pointer ${
+                      selectedGuest.id === g.id ? 'border-[#1b6c80] bg-[#f4f6f8]' : 'border-[#e8eaec]'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-medium text-[#131416]">{g.name}</span>
+                        <p className="text-[#5d5f60] font-mono">{g.ref}</p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[11px] ${g.status === 'Checked-In' ? 'bg-[#dcfae5] text-[#04250e]' : 'bg-[#fffbeb] text-[#92400e]'}`}>
+                        {g.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-[#5d5f60] flex justify-between">
+                      <span>{g.room}</span>
+                      <span className="font-mono">{g.bike}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Stay & Assignment</span>
-                    <div className="font-medium text-slate-200">3 Nights Stay</div>
-                    <div className="text-[10px] text-emerald-400 font-mono">Bunk #101-A2 (Upper)</div>
-                  </div>
-                </div>
+                ))}
               </div>
+            </div>
 
-              {/* OTP Input Section */}
-              <div className="mt-4">
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider font-label mb-2 flex items-center justify-between">
-                  <span>Secure 6-Digit Guest OTP</span>
-                  <span className="text-[10px] text-amber-400 font-mono font-normal">SMS sent to +91 98230•••40</span>
-                </label>
+            <div className="lg:col-span-7">
+              <div className="border border-[#e8eaec] rounded p-6 space-y-6">
+                <div className="border-b border-[#f0f1f2] pb-4 flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-medium text-[#131416]">{selectedGuest.name}</h3>
+                    <p className="text-[#5d5f60] font-mono">{selectedGuest.ref} • {selectedGuest.room}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[#5d5f60]">Outstanding</span>
+                    <div className="font-mono font-medium text-[#131416] text-base">₹{selectedGuest.balance}</div>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-6 gap-2">
-                  {['8', '4', '9', '2', '1', '0'].map((digit, i) => (
+                <div className="space-y-2">
+                  <label className="block text-[#5d5f60]">Guest 6-digit arrival OTP</label>
+                  <div className="flex gap-3">
                     <input
-                      key={i}
                       type="text"
-                      maxLength={1}
-                      defaultValue={digit}
-                      className="h-11 text-center font-headline text-lg font-bold bg-slate-950 border border-amber-500/70 text-amber-400 rounded-lg focus:outline-none"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={(e) => setOtpInput(e.target.value)}
+                      className="w-40 px-3 py-2 border border-[#cdced1] rounded text-center font-mono text-xl tracking-widest text-[#131416]"
                     />
-                  ))}
+                    <button
+                      onClick={handleVerifyOtp}
+                      className="px-4 py-2 bg-[#131416] text-white rounded font-medium hover:bg-neutral-800"
+                    >
+                      Verify OTP and check in
+                    </button>
+                  </div>
+                  <p className="text-[#5d5f60]">Active demo code: <span className="font-mono font-medium">849204</span></p>
                 </div>
 
-                <button
-                  onClick={handleVerifyOtp}
-                  className="mt-3.5 w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-headline font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg"
-                >
-                  <span className="material-symbols-outlined text-base font-bold">verified</span>
-                  <span>{guestCheckedIn ? '✓ Verified & Checked-In' : 'Verify OTP & Issue Room PIN'}</span>
-                </button>
-              </div>
-
-              {/* Live Issued Access Box */}
-              <div className="mt-4 p-3.5 rounded-lg bg-slate-950/90 border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                      Room & Locker Digital Keycode
-                    </span>
-                    <div className="font-mono text-2xl font-black text-amber-400 tracking-widest mt-0.5">
-                      {accessCode}
+                <div className="p-4 bg-[#f9fbfc] border border-[#e8eaec] rounded space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-[#5d5f60]">Active door keypad PIN</span>
+                      <div className="text-2xl font-mono font-medium text-[#1b6c80] mt-0.5">{selectedGuest.keycode}</div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => alert(`Copied Keycode ${accessCode}`)}
-                      className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      title="Copy PIN"
+                      onClick={handleRegenerateKeycode}
+                      className="px-3 py-1.5 border border-[#cdced1] rounded text-[#131416] hover:bg-white"
                     >
-                      <span className="material-symbols-outlined text-base">content_copy</span>
-                    </button>
-                    <button
-                      onClick={() => alert(`Sent Keycode ${accessCode} via WhatsApp to +91 9823048291`)}
-                      className="p-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-800"
-                      title="Send WhatsApp"
-                    >
-                      <span className="material-symbols-outlined text-base">chat</span>
+                      Revoke and re-issue PIN
                     </button>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
-                  <span className="text-slate-400">Gate Boom Barrier</span>
-                  <span className="text-emerald-400 font-mono font-medium flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">check_circle</span> ANPR Auto-Clear Active
-                  </span>
+                  <div className="border-t border-[#e8eaec] pt-2 text-[#5d5f60] flex justify-between">
+                    <span>ANPR barrier gate: cleared</span>
+                    <span>Bay 04 assigned</span>
+                  </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-                <button
-                  onClick={handleRevokeCode}
-                  className="w-full mt-1 py-1.5 rounded border border-rose-500/40 text-rose-400 hover:bg-rose-500/10 text-[11px] font-label font-semibold transition-all"
-                >
-                  {codeRevoked ? 'Regenerating new cipher PIN...' : 'Revoke / Regenerate Keycode'}
+        {/* TAB 2: TAPE CHART */}
+        {activeTab === 'tape' && (
+          <div className="space-y-4 text-xs">
+            <h2 className="text-base font-medium text-[#131416]">5-day room tape chart</h2>
+            <div className="overflow-x-auto border border-[#e8eaec] rounded">
+              <table className="w-full text-left">
+                <thead className="bg-[#f9fbfc] text-[#5d5f60] border-b border-[#e8eaec]">
+                  <tr>
+                    <th className="p-3 w-40">Unit</th>
+                    <th className="p-3">Fri, 14 Nov</th>
+                    <th className="p-3">Sat, 15 Nov</th>
+                    <th className="p-3">Sun, 16 Nov</th>
+                    <th className="p-3">Mon, 17 Nov</th>
+                    <th className="p-3">Tue, 18 Nov</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f0f1f2]">
+                  {[
+                    { room: 'Bed 101-A1', guest: 'Available', status: 'free' },
+                    { room: 'Bed 101-A2', guest: 'Arjun Singhania (Himalayan 450)', status: 'busy' },
+                    { room: 'Bed 101-A3', guest: 'Rohit Sharma (Adv 390)', status: 'busy' },
+                    { room: 'Pod 204-B1', guest: 'Vikram Rathore (KTM 390)', status: 'busy' },
+                    { room: 'Pod 204-B2', guest: 'Available', status: 'free' },
+                    { room: 'Suite 102-A', guest: 'Ananya Sen (BMW G310GS)', status: 'busy' },
+                  ].map((r, i) => (
+                    <tr key={i}>
+                      <td className="p-3 font-medium text-[#131416] bg-[#f9fbfc]">{r.room}</td>
+                      <td colSpan={r.status === 'busy' ? 3 : 1} className="p-2">
+                        {r.status === 'busy' ? (
+                          <div className="p-2 bg-[#f4f6f8] border border-[#e8eaec] rounded text-[#131416]">
+                            {r.guest}
+                          </div>
+                        ) : (
+                          <div className="p-2 text-[#1e7b4f] bg-[#dcfae5]/50 border border-[#dcfae5] rounded text-center">
+                            Available (₹849)
+                          </div>
+                        )}
+                      </td>
+                      {r.status === 'busy' ? (
+                        <>
+                          <td className="p-2"><div className="p-2 text-center text-[#5d5f60]">Available</div></td>
+                          <td className="p-2"><div className="p-2 text-center text-[#5d5f60]">Available</div></td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-2"><div className="p-2 text-center text-[#5d5f60]">Available</div></td>
+                          <td className="p-2"><div className="p-2 text-center text-[#5d5f60]">Available</div></td>
+                          <td className="p-2"><div className="p-2 text-center text-[#5d5f60]">Available</div></td>
+                          <td className="p-2"><div className="p-2 text-center text-[#5d5f60]">Available</div></td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: FOLIOS & BILLING */}
+        {activeTab === 'folios' && (
+          <div className="space-y-6 text-xs">
+            <div className="flex justify-between items-center border-b border-[#f0f1f2] pb-3">
+              <div>
+                <h2 className="text-base font-medium text-[#131416]">Folio #FL-9482 • {selectedGuest.name}</h2>
+                <p className="text-[#5d5f60] font-mono">{selectedGuest.room}</p>
+              </div>
+              <button
+                onClick={() => setSplitFolioActive(!splitFolioActive)}
+                className={`px-3 py-1.5 border rounded ${splitFolioActive ? 'border-[#1b6c80] bg-[#f4f6f8] text-[#1b6c80] font-medium' : 'border-[#cdced1] text-[#131416]'}`}
+              >
+                {splitFolioActive ? 'Folio split active (Corporate + Personal)' : 'Split folio'}
+              </button>
+            </div>
+
+            <div className="border border-[#e8eaec] rounded overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-[#f9fbfc] text-[#5d5f60] border-b border-[#e8eaec]">
+                  <tr>
+                    <th className="p-3">Service</th>
+                    <th className="p-3">Category</th>
+                    <th className="p-3">Sub-folio routing</th>
+                    <th className="p-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f0f1f2]">
+                  {folioItems.map((item) => (
+                    <tr key={item.id}>
+                      <td className="p-3 text-[#131416]">{item.desc}</td>
+                      <td className="p-3 text-[#5d5f60] font-mono">{item.type}</td>
+                      <td className="p-3 text-[#5d5f60]">
+                        {splitFolioActive && (item.type === 'CAFE' || item.type === 'LAUNDRY')
+                          ? 'Sub-folio B (Personal)'
+                          : 'Sub-folio A (Company GST)'}
+                      </td>
+                      <td className="p-3 text-right font-mono text-[#131416]">₹{item.amount.toLocaleString('en-IN')}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-[#f9fbfc] font-medium text-[#131416]">
+                    <td colSpan={3} className="p-3 text-right">Total outstanding:</td>
+                    <td className="p-3 text-right font-mono">₹{totalFolioAmount.toLocaleString('en-IN')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 bg-[#f9fbfc] border border-[#e8eaec] rounded space-y-3">
+              <span className="font-medium text-[#131416] block">Post additional charge</span>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newChargeDesc}
+                  onChange={(e) => setNewChargeDesc(e.target.value)}
+                  placeholder="Description..."
+                  className="flex-1 px-3 py-1.5 border border-[#cdced1] rounded bg-white text-[#131416]"
+                />
+                <input
+                  type="number"
+                  value={newChargeAmount}
+                  onChange={(e) => setNewChargeAmount(e.target.value)}
+                  placeholder="Amount ₹"
+                  className="w-28 px-3 py-1.5 border border-[#cdced1] rounded bg-white font-mono text-[#131416]"
+                />
+                <button onClick={handleAddFolioCharge} className="px-4 py-1.5 bg-[#131416] text-white rounded font-medium">
+                  Post to folio
                 </button>
               </div>
-            </section>
-
-            {/* Moto Bay & Gear Locker Widget */}
-            <section className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-500">garage_home</span>
-                  <h3 className="font-headline text-sm font-bold text-white uppercase tracking-wider">
-                    Moto Bay & Gear Vault
-                  </h3>
-                </div>
-                <span className="text-[11px] font-mono text-amber-400">6 Bays Monitored</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-amber-500/30">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Bay 01</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-                  </div>
-                  <div className="text-xs font-bold text-slate-200 mt-1 truncate">Tiger 900</div>
-                  <div className="text-[9px] text-slate-500 font-mono">KA 04 MP</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-amber-500/30">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Bay 02</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-                  </div>
-                  <div className="text-xs font-bold text-slate-200 mt-1 truncate">KTM 390</div>
-                  <div className="text-[9px] text-slate-500 font-mono">DL 03 AP</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-emerald-500/30">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Bay 03</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                  </div>
-                  <div className="text-xs font-bold text-emerald-400 mt-1">Available</div>
-                  <div className="text-[9px] text-slate-500 font-mono">Ready</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-amber-500/50">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Bay 04</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
-                  </div>
-                  <div className="text-xs font-bold text-amber-300 mt-1 truncate">Himalayan</div>
-                  <div className="text-[9px] text-amber-400 font-mono">MH 12 QX</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-amber-500/30">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Bay 05</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-                  </div>
-                  <div className="text-xs font-bold text-slate-200 mt-1 truncate">Interceptor</div>
-                  <div className="text-[9px] text-slate-500 font-mono">GA 01 R</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-950 border border-emerald-500/30">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Bay 06</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                  </div>
-                  <div className="text-xs font-bold text-emerald-400 mt-1">Available</div>
-                  <div className="text-[9px] text-slate-500 font-mono">Ready</div>
-                </div>
-              </div>
-
-              {/* High-Pressure Wash Bay status */}
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-400">cleaning_services</span>
-                  <div>
-                    <div className="font-semibold text-slate-200">High-Pressure Wash Bay</div>
-                    <div className="text-[10px] text-slate-400">120 PSI Foam Gun Active</div>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 font-bold">
-                  RUNNING
-                </span>
-              </div>
-            </section>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* TAB 4: HOUSEKEEPING */}
+        {activeTab === 'housekeeping' && (
+          <div className="space-y-4 text-xs">
+            <h2 className="text-base font-medium text-[#131416]">Housekeeping and room readiness</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {rooms.map((r) => (
+                <div key={r.id} className="border border-[#e8eaec] rounded p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium text-[#131416] text-sm">{r.name}</h3>
+                      <p className="text-[#5d5f60]">{r.type}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[11px] ${
+                      r.status === 'Clean' ? 'bg-[#dcfae5] text-[#04250e]' : r.status === 'Dirty' ? 'bg-[#ffedea] text-[#831c1e]' : 'bg-[#fffbeb] text-[#92400e]'
+                    }`}>
+                      {r.status}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-[#f0f1f2]">
+                    <button
+                      onClick={() => handleUpdateRoomStatus(r.id, 'Dirty')}
+                      className={`flex-1 py-1 border rounded ${r.status === 'Dirty' ? 'border-[#c4242a] text-[#c4242a] font-medium' : 'border-[#cdced1]'}`}
+                    >
+                      Dirty
+                    </button>
+                    <button
+                      onClick={() => handleUpdateRoomStatus(r.id, 'Cleaning')}
+                      className={`flex-1 py-1 border rounded ${r.status === 'Cleaning' ? 'border-[#92400e] text-[#92400e] font-medium' : 'border-[#cdced1]'}`}
+                    >
+                      Cleaning
+                    </button>
+                    <button
+                      onClick={() => handleUpdateRoomStatus(r.id, 'Clean')}
+                      className={`flex-1 py-1 border rounded ${r.status === 'Clean' ? 'border-[#1e7b4f] text-[#1e7b4f] font-medium' : 'border-[#cdced1]'}`}
+                    >
+                      Ready
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: SHIFT HANDOVER */}
+        {activeTab === 'handover' && (
+          <div className="space-y-4 text-xs">
+            <h2 className="text-base font-medium text-[#131416]">Shift handover log</h2>
+            <div className="space-y-2">
+              {handoverLogs.map((log) => (
+                <div key={log.id} className="p-3 border border-[#e8eaec] rounded bg-[#f9fbfc]">
+                  <div className="flex justify-between text-[#5d5f60]">
+                    <span className="font-medium text-[#131416]">{log.shift}</span>
+                    <span className="font-mono">{log.time} • {log.author}</span>
+                  </div>
+                  <p className="mt-1 text-[#131416] leading-relaxed">{log.note}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 border border-[#e8eaec] rounded bg-[#f9fbfc] space-y-2">
+              <span className="font-medium text-[#131416] block">Record handover entry</span>
+              <textarea
+                rows={2}
+                value={newHandoverNote}
+                onChange={(e) => setNewHandoverNote(e.target.value)}
+                placeholder="Notes for next shift..."
+                className="w-full p-2 border border-[#cdced1] rounded bg-white text-[#131416]"
+              />
+              <button onClick={handleAddHandover} className="px-4 py-1.5 bg-[#131416] text-white rounded font-medium">
+                Save note
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: LOST & FOUND */}
+        {activeTab === 'lostfound' && (
+          <div className="space-y-4 text-xs">
+            <h2 className="text-base font-medium text-[#131416]">Lost and found registry</h2>
+            <div className="border border-[#e8eaec] rounded overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-[#f9fbfc] text-[#5d5f60] border-b border-[#e8eaec]">
+                  <tr>
+                    <th className="p-3">Item</th>
+                    <th className="p-3">Location found</th>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f0f1f2]">
+                  {lostItems.map((item) => (
+                    <tr key={item.id}>
+                      <td className="p-3 font-medium text-[#131416]">{item.item}</td>
+                      <td className="p-3 text-[#5d5f60]">{item.location}</td>
+                      <td className="p-3 text-[#5d5f60] font-mono">{item.date}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[11px] ${item.status.includes('Claimed') ? 'bg-[#dcfae5] text-[#04250e]' : 'bg-[#fffbeb] text-[#92400e]'}`}>
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border border-[#e8eaec] rounded bg-[#f9fbfc] space-y-2">
+              <span className="font-medium text-[#131416] block">Log discovered item</span>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="Item description..."
+                  className="px-3 py-1.5 border border-[#cdced1] rounded bg-white text-[#131416]"
+                />
+                <input
+                  type="text"
+                  value={newItemLocation}
+                  onChange={(e) => setNewItemLocation(e.target.value)}
+                  placeholder="Found location..."
+                  className="px-3 py-1.5 border border-[#cdced1] rounded bg-white text-[#131416]"
+                />
+              </div>
+              <button onClick={handleAddLostItem} className="px-4 py-1.5 bg-[#131416] text-white rounded font-medium">
+                Record in registry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: DAY CLOSE */}
+        {activeTab === 'dayclose' && (
+          <div className="max-w-xl mx-auto border border-[#e8eaec] rounded p-6 space-y-6 text-xs">
+            <div>
+              <h2 className="text-lg font-medium text-[#131416]">Night audit and day close</h2>
+              <p className="text-[#5d5f60] mt-0.5">Audits folios, verifies payment ledger, and advances calendar date.</p>
+            </div>
+
+            <div className="p-4 bg-[#f9fbfc] border border-[#e8eaec] rounded space-y-2">
+              <div className="flex justify-between text-[#5d5f60]">
+                <span>Room and pod revenue:</span>
+                <span className="font-mono font-medium text-[#131416]">₹42,650</span>
+              </div>
+              <div className="flex justify-between text-[#5d5f60]">
+                <span>Parking and locker add-ons:</span>
+                <span className="font-mono font-medium text-[#131416]">₹4,200</span>
+              </div>
+              <div className="flex justify-between text-[#5d5f60]">
+                <span>Cafe commissary revenue:</span>
+                <span className="font-mono font-medium text-[#131416]">₹3,840</span>
+              </div>
+              <div className="flex justify-between text-[#5d5f60]">
+                <span>GST collected (HSN 9963: 6% + 6%):</span>
+                <span className="font-mono font-medium text-[#131416]">₹6,082</span>
+              </div>
+              <div className="border-t border-[#e8eaec] pt-2 flex justify-between font-medium text-sm text-[#131416]">
+                <span>Total ledger value:</span>
+                <span className="font-mono">₹56,772</span>
+              </div>
+            </div>
+
+            {dayCloseCompleted ? (
+              <div className="p-3 bg-[#dcfae5] text-[#04250e] border border-[#b8f5cb] rounded">
+                Day close successfully executed. Financial ledger locked with cryptographic signature.
+              </div>
+            ) : (
+              <button
+                onClick={handleExecuteDayClose}
+                disabled={dayCloseExecuting}
+                className="w-full py-2.5 bg-[#131416] text-white rounded font-medium hover:bg-neutral-800"
+              >
+                {dayCloseExecuting ? 'Auditing ledger...' : 'Execute day close audit'}
+              </button>
+            )}
+          </div>
+        )}
       </main>
-
-      {/* Docked Bottom Bar for Day Close */}
-      <footer className="sticky bottom-0 z-40 bg-slate-950/95 border-t border-slate-800 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-          <span>Shift Front Desk 01</span>
-          <span>•</span>
-          <span>Manager: Vikram S.</span>
-          <span>•</span>
-          <span className="text-slate-200">Shift Cash: ₹14,250</span>
-          <span>•</span>
-          <span className="text-emerald-400">Active Keycards: 28</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {dayCloseDone && (
-            <span className="text-xs text-emerald-400 font-mono font-bold">
-              ✓ Day-close processed & audit logs sealed!
-            </span>
-          )}
-          <button
-            onClick={handleDayClose}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-headline font-bold text-xs uppercase tracking-wider rounded-lg flex items-center gap-2 shadow-lg"
-          >
-            <span className="material-symbols-outlined text-base">verified_user</span>
-            <span>Audit Shift & Initiate Day Close</span>
-          </button>
-        </div>
-      </footer>
     </div>
   );
 }

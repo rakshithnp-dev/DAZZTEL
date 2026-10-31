@@ -1,0 +1,29 @@
+/* Hallmark · shape: Sample Drawer · genre: modern-minimal · theme: Terrazzo · job: book · draw: 7f3b890a
+ * hero: ledge · nav: edge-aligned · footer: mast · imagery: natural · signature: motorcycle bay and pod accommodation card · terrazzo: warm-paper
+ * axes: light/geometric-sans/warm · posture: restrained · contrast: pass · fold: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · weakest: none, crisp pure white paper and hospitality card tokens */
+:root {
+  color-scheme: light;
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px; --space-2xl: 48px; --space-3xl: 64px; --space-4xl: 96px;
+  --text-xs: 0.8125rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.25rem; --text-xl: 1.5625rem; --text-2xl: 1.953rem; --text-3xl: 2.441rem;
+  --text-display-s: clamp(2rem, 3.5vw + 0.5rem, 3rem); --text-display: clamp(2.5rem, 4.5vw + 1rem, 4.25rem);
+  --text-section: clamp(1.75rem, 2vw + 1rem, 2.75rem); --text-title: clamp(1.125rem, 0.75vw + 0.875rem, 1.5rem); --text-lead: clamp(1rem, 0.35vw + 0.875rem, 1.25rem);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  --color-error: oklch(52% 0.19 27); --color-error-hover: oklch(45% 0.19 27); --color-success: oklch(50% 0.12 150);
+  --container: 1440px; --gutter: 48px; --gap-columns: 24px; --section-gap-s: 80px; --section-gap: 112px; --section-gap-l: 144px;
+  --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
+  --color-paper: oklch(100% 0 0); --color-paper-2: oklch(98% 0.003 80); --color-paper-3: oklch(95% 0.006 80);
+  --color-plate: oklch(100% 0 0); --color-white: oklch(100% 0 0);
+  --color-ink: oklch(16% 0.01 60); --color-ink-2: oklch(28% 0.01 60); --color-muted: oklch(48% 0.012 60);
+  --color-rule: oklch(91% 0.005 80); --color-ink-rule: oklch(34% 0.01 60);
+  --color-accent: oklch(58% 0.19 45); --color-accent-hover: oklch(50% 0.19 45); --color-accent-soft: oklch(96% 0.04 55); --color-accent-ink: oklch(100% 0 0); --color-focus: oklch(58% 0.19 45);
+  --font-display: "Plus Jakarta Sans", "Syne", ui-sans-serif, sans-serif;
+  --font-body: "Inter", "Onest", ui-sans-serif, sans-serif;
+  --font-outlier: "JetBrains Mono", ui-monospace, monospace;
+  --radius-card: 16px; --radius-pill: 999px; --rule-hair: 1px; --rule-bar: 2px;
+  --shadow-nav: 0 1px 3px 0 oklch(20% 0.02 60 / 0.05);
+  --shadow-card: 0 4px 20px -2px oklch(20% 0.02 60 / 0.06);
+  --shadow-card-hover: 0 12px 32px -4px oklch(20% 0.02 60 / 0.14);
+  --tracking-display: -0.025em; --display-weight: 700;
+}
