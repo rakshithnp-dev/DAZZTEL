@@ -1,7 +1,8 @@
 {
-  "name": "hotelyo",
+  "name": "dazztel",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@9.14.4",
   "description": "Production-grade multi-property hostel hospitality management platform for India",
   "scripts": {
     "build": "pnpm -r run build",
