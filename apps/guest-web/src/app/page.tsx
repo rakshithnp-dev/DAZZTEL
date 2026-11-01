@@ -147,9 +147,62 @@ const CAFE_MENU: CafeItem[] = [
   { id: 'c-4', name: 'Touring Campfire Toastie', price: 220, category: 'Mains', description: 'Smoked cheddar, caramelized shallots, and spicy mustard on grilled brioche.' },
 ];
 
+interface HeroSlide {
+  id: string;
+  tag: string;
+  headline: string;
+  subhead: string;
+  image: string;
+}
+
+const HERO_SLIDES: HeroSlide[] = [
+  {
+    id: 'slide-1',
+    tag: 'Sanctuary 01 • Sakrepatna, Karnataka',
+    headline: 'Sleep Soundly. Ride Boundless.',
+    subhead: 'India’s engineered boutique hostel network for touring motorcyclists and remote digital nomads.',
+    image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1600&q=80',
+  },
+  {
+    id: 'slide-2',
+    tag: 'Moto Infrastructure • Ground Floor Bays',
+    headline: 'Covered Bays & Dedicated Workshop.',
+    subhead: 'Concrete motorcycle bays with paddock stands, torque tools, chain maintenance station, and 24/7 CCTV surveillance.',
+    image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1600&q=80',
+  },
+  {
+    id: 'slide-3',
+    tag: 'Engineered Recovery • -32dB Acoustic Shell',
+    headline: 'Acoustic Silence. Heated Gear Vaults.',
+    subhead: 'Private soundproof sleeping capsules with 45°C drying vaults designed specifically for damp helmets, boots, and riding armor.',
+    image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1600&q=80',
+  },
+  {
+    id: 'slide-4',
+    tag: 'Western Ghats Loop • Chikkamagaluru Ridges',
+    headline: 'Coffee Estates & High Mountain Passes.',
+    subhead: 'Curated GPX route loops directly from the sanctuary to Mullayanagiri Peak, Bababudangiri twists, and Bhadra Ghats.',
+    image: 'https://images.unsplash.com/photo-1508974239320-0a029497e820?auto=format&fit=crop&w=1600&q=80',
+  },
+];
+
 export default function HomePage() {
   // Client Showcase Portal Selector
   const [activePortal, setActivePortal] = useState<'guest' | 'pms' | 'group' | 'housekeeping' | 'manager' | 'vendor' | 'admin' | '3d'>('guest');
+
+  // Hero Carousel State
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto-advance slides every 5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
 
   // Search & Filters
   const [destination, setDestination] = useState('Sakrepatna, Karnataka');
@@ -454,24 +507,74 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
       {/* 2. GUEST FRONT-END EXPERIENCE */}
       {activePortal === 'guest' && (
         <main style={{ maxWidth: 'var(--container)', margin: '0 auto', padding: 'var(--space-md) var(--space-md)', width: '100%', boxSizing: 'border-box' }}>
-          {/* Hero Section */}
-          <section className="hero-box">
-            <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-              <img
-                src="https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1600&q=80"
-                alt="Touring motorcyclist heading to DAZZTEL Sanctuary in Sakrepatna, Karnataka"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, oklch(10% 0.01 60 / 0.2) 0%, oklch(10% 0.01 60 / 0.82) 100%)' }} />
-            </div>
+          {/* Hero Section Carousel */}
+          <section className="hero-box" aria-label="Featured Highlights">
+            {HERO_SLIDES.map((slide, idx) => {
+              const isActive = idx === currentSlide;
+              return (
+                <div
+                  key={slide.id}
+                  className={`hero-slide ${isActive ? 'hero-slide--active' : 'hero-slide--inactive'}`}
+                  aria-hidden={!isActive}
+                >
+                  <img
+                    src={slide.image}
+                    alt={slide.headline}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, oklch(10% 0.01 60 / 0.15) 0%, oklch(10% 0.01 60 / 0.86) 100%)' }} />
 
-            <div style={{ position: 'relative', zIndex: 1, maxWidth: '700px' }}>
-              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-display)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 var(--space-xs) 0', wordBreak: 'break-word' }}>
-                Sleep Soundly. Ride Boundless.
-              </h1>
-              <p style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-lead)', color: 'oklch(95% 0.01 80)', margin: '0 0 var(--space-md) 0', lineHeight: 1.4 }}>
-                India’s engineered boutique hostel network for touring motorcyclists and remote digital nomads.
-              </p>
+                  <div className="hero-content-wrap">
+                    <span className="tag-badge tag-badge--amber" style={{ marginBottom: 'var(--space-xs)', display: 'inline-block', backdropFilter: 'blur(6px)' }}>
+                      {slide.tag}
+                    </span>
+                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-display)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 var(--space-xs) 0', color: '#fff', wordBreak: 'break-word' }}>
+                      {slide.headline}
+                    </h1>
+                    <p style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-lead)', color: 'oklch(95% 0.01 80)', margin: 0, lineHeight: 1.4 }}>
+                      {slide.subhead}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Carousel Navigation & Indicators */}
+            <div className="hero-carousel-nav">
+              <div className="hero-dots-wrap">
+                {HERO_SLIDES.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    aria-label={`Go to slide ${idx + 1}`}
+                    onClick={() => setCurrentSlide(idx)}
+                    className={`hero-dot ${idx === currentSlide ? 'hero-dot--active' : 'hero-dot--inactive'}`}
+                  />
+                ))}
+              </div>
+
+              <span style={{ fontFamily: 'var(--font-outlier)', fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.7)', marginLeft: 'var(--space-2xs)', marginRight: 'var(--space-2xs)' }}>
+                {String(currentSlide + 1).padStart(2, '0')} / {String(HERO_SLIDES.length).padStart(2, '0')}
+              </span>
+
+              <div style={{ display: 'flex', gap: 'var(--space-3xs)' }}>
+                <button
+                  type="button"
+                  aria-label="Previous slide"
+                  onClick={prevSlide}
+                  className="hero-arrow-btn"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next slide"
+                  onClick={nextSlide}
+                  className="hero-arrow-btn"
+                >
+                  ›
+                </button>
+              </div>
             </div>
           </section>
 
