@@ -149,7 +149,7 @@ const CAFE_MENU: CafeItem[] = [
 
 export default function HomePage() {
   // Client Showcase Portal Selector
-  const [activePortal, setActivePortal] = useState<'guest' | 'pms' | 'group' | 'housekeeping' | 'manager' | 'vendor' | 'admin'>('guest');
+  const [activePortal, setActivePortal] = useState<'guest' | 'pms' | 'group' | 'housekeeping' | 'manager' | 'vendor' | 'admin' | '3d'>('guest');
 
   // Search & Filters
   const [destination, setDestination] = useState('Sakrepatna, Karnataka');
@@ -388,6 +388,13 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
             >
               7. HQ Admin Audit
             </button>
+            <button
+              type="button"
+              className={`showcase-pill ${activePortal === '3d' ? 'showcase-pill--active' : ''}`}
+              onClick={() => setActivePortal('3d')}
+            >
+              8. 3D Architecture (G+3)
+            </button>
           </div>
         </div>
       </div>
@@ -415,6 +422,9 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
             <nav className="nav-links-desktop">
               <a href="#stays" style={{ textDecoration: 'none', color: 'var(--color-ink)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                 Stays &amp; Pods
+              </a>
+              <a href="#model3d" style={{ textDecoration: 'none', color: 'var(--color-accent)', fontSize: 'var(--text-sm)', fontWeight: 700 }}>
+                3D Building Model
               </a>
               <a href="#garage" style={{ textDecoration: 'none', color: 'var(--color-ink)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                 Garage &amp; Workshop
@@ -1089,6 +1099,40 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
               </div>
             </div>
           )}
+
+          {/* Section: Interactive 3D Architecture Model (G+3) */}
+          <section id="model3d" style={{ marginBottom: 'var(--space-3xl)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+              <div>
+                <span className="tag-badge tag-badge--amber" style={{ marginBottom: 'var(--space-2xs)', display: 'inline-block' }}>
+                  Interactive 3D Massing &amp; Floor Plans
+                </span>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-section)', fontWeight: 700, margin: 'var(--space-3xs) 0' }}>
+                  Dazztel 3D Building Model (G+3)
+                </h2>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)', margin: 0 }}>
+                  Proposed residence · 36 × 47 ft · G+3 · Plans R0. Drag to orbit, switch floors, explode layers, dusk lighting &amp; cut-away slider.
+                </p>
+              </div>
+              <a
+                href="/3d"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn--primary btn--sm"
+                style={{ textDecoration: 'none' }}
+              >
+                Open Fullscreen 3D ↗
+              </a>
+            </div>
+
+            <div style={{ width: '100%', height: '620px', borderRadius: 'var(--radius-card)', overflow: 'hidden', border: '1px solid var(--color-rule)', boxShadow: 'var(--shadow-card)', background: 'var(--color-white)' }}>
+              <iframe
+                src="/3d.html"
+                title="Dazztel 3D Architecture"
+                style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+              />
+            </div>
+          </section>
 
           {/* Section: Motorcyclist & Nomad Facilities */}
           <section id="garage" style={{ marginBottom: 'var(--space-3xl)' }}>
@@ -1874,6 +1918,17 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
               </table>
             </div>
           </div>
+        </main>
+      )}
+
+      {/* 8. 3D ARCHITECTURAL MODEL PORTAL VIEW */}
+      {activePortal === '3d' && (
+        <main style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '680px', margin: 0, padding: 0 }}>
+          <iframe
+            src="/3d.html"
+            title="Dazztel 3D Architecture Model"
+            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          />
         </main>
       )}
 

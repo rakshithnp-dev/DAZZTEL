@@ -1,0 +1,384 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Dazztel 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: full-height viewer, canvas left, floor controls and room schedule right (stacked on phones) */
+:root{
+  --bg:#ECEAE5; --panel:#F6F4F0; --fg:#1B1B1D; --muted:#6A675F; --line:#D5D1C8;
+  --accent:#E4470A; --accent-fg:#fff; --scene:#DCD9D2; --ground:#C9C5BB;
+  --font-display:"Fraunces",Georgia,serif; --font-body:"Hanken Grotesk",system-ui,sans-serif; --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#151515; --panel:#1E1E1F; --fg:#EFEDE8; --muted:#9C988E; --line:#333230;
+  --accent:#FF6A2B; --accent-fg:#151515; --scene:#202022; --ground:#2A2A2C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151515; --panel:#1E1E1F; --fg:#EFEDE8; --muted:#9C988E; --line:#333230;
+  --accent:#FF6A2B; --accent-fg:#151515; --scene:#202022; --ground:#2A2A2C; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;
+  display:flex;flex-direction:column;gap:12px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--font-display);font-weight:600;font-size:1.6rem;letter-spacing:-.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:.85rem;font-family:var(--font-mono)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px}
+#stage{position:relative;min-height:360px;background:var(--scene);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hint{position:absolute;left:10px;bottom:8px;font:11px var(--font-mono);color:var(--muted);pointer-events:none}
+#tag{position:absolute;left:10px;top:8px;font:12px var(--font-mono);color:var(--fg);background:var(--panel);border:1px solid var(--line);padding:3px 8px;border-radius:4px;display:none}
+aside{min-width:0;display:flex;flex-direction:column;gap:12px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+h2{font:600 .72rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--fg)}
+button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+label{display:flex;justify-content:space-between;font-size:.85rem}
+#rooms{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+#rooms li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);cursor:pointer}
+#rooms li:hover{color:var(--accent)}
+#rooms li span:last-child{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);white-space:nowrap}
+.note{color:var(--muted);font-size:.78rem;margin:0}
+@media (max-width:820px){
+  body{height:auto}
+  main{grid-template-columns:minmax(0,1fr)}
+  #stage{height:62vh}
+}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Hanken+Grotesk:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<header>
+  <h1>Dazztel 3D</h1>
+  <span class="sub">Proposed residence for Mr Darshan · 36 × 47 ft · G+3 · plans R0, 22 Sep 2026</span>
+</header>
+<main>
+  <div id="stage"><canvas id="c"></canvas><div id="tag"></div><div id="hint">drag to orbit · scroll or pinch to zoom · right-drag to pan</div></div>
+  <aside>
+    <section>
+      <h2>Floors</h2>
+      <div class="row" id="floors"></div>
+    </section>
+    <section>
+      <h2>View</h2>
+      <div class="row">
+        <button id="bExplode" aria-pressed="false">Explode floors</button>
+        <button id="bRoof" aria-pressed="true">Roof</button>
+        <button id="bDusk" aria-pressed="true">Dusk lights</button>
+        <button id="bSpin" aria-pressed="false">Auto-rotate</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button data-cam="front">Front</button><button data-cam="corner">Corner</button><button data-cam="top">Plan</button><button data-cam="side">Side</button>
+      </div>
+      <label style="margin-top:10px"><span>Cut-away</span><span id="cutv">off</span></label>
+      <input id="cut" type="range" min="0" max="100" value="0" aria-label="Cut away the front wall">
+    </section>
+    <section>
+      <h2 id="rt">Rooms</h2>
+      <ul id="rooms"></ul>
+    </section>
+    <p class="note">Room positions are read from the four 22 Sep 2026 drawings (not to scale, built-up area not yet stated). Facade follows the supplied renders. Treat as a massing model for discussion.</p>
+  </aside>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>(function(){
+// Room data in feet. x runs left to right, z runs from rear (0) to road frontage. [name, x, z, w, d, size, kind]
+var W = 36, D = 47;
+var FLOORS = [
+  { id: 'GF', name: 'Ground', base: 0, h: 11, depth: 46.5, rooms: [
+    ['Parking (rear)', 14, 0, 22, 20, '35\'0"×20\'0" total', 'open'],
+    ['LB room', 0.5, 0, 7, 12.5, '7\'0"×12\'6"', 'room'],
+    ['Service', 8, 0, 6, 8, '6\'0"×8\'0"', 'service'],
+    ['A.Bath', 0.5, 13, 5.5, 7, '5\'6"×7\'0"', 'bath'],
+    ['Lift', 0.5, 20.5, 5.5, 7, '5\'6"×7\'0"', 'core'],
+    ['Stair', 10.5, 20.5, 14.5, 7, '14\'6"×7\'0"', 'core'],
+    ['Kitchen', 25.4, 20.5, 10, 8.5, '10\'0"×8\'6"', 'service'],
+    ['Kitchen counter', 25.4, 29.4, 10, 2.6, '10\'0"×2\'6"', 'service'],
+    ['Reception', 0.5, 28, 10, 11, '10\'0"×13\'6"', 'room'],
+    ['Restaurant', 10.5, 28, 25, 18, '24\'6"×16\'6"', 'dine'],
+    ['Toilet 1', 0.5, 39.5, 5.5, 3, '5\'6"×3\'0"', 'bath'],
+    ['Toilet 2', 0.5, 43, 5.5, 3, '5\'6"×3\'0"', 'bath']
+  ]},
+  { id: 'FF', name: 'First', base: 11, h: 10, depth: 47.5, rooms: [
+    ['A.Bath (NW)', 0.5, 0, 8.5, 4.5, '8\'0"×4\'6"', 'bath'],
+    ['A.Bath (N)', 11.4, 0, 8.4, 4.5, '8\'0"×4\'6"', 'bath'],
+    ['8-bed dorm (rear)', 0.5, 5, 19.3, 10, '19\'6"×10\'0"', 'dorm'],
+    ['6-bed dorm', 20.4, 0, 10, 15.5, '10\'0"×15\'6"', 'dorm'],
+    ['A.Bath (E1)', 30.8, 0, 4.5, 8.5, '4\'6"×8\'0"', 'bath'],
+    ['Toilet', 30.8, 11, 4.5, 4.4, '4\'6"×4\'0"', 'bath'],
+    ['Store', 30.8, 16, 4.5, 4, '4\'6"×4\'0"', 'service'],
+    ['A.Bath (E2)', 30.8, 20.4, 4.5, 8.3, '4\'6"×8\'0"', 'bath'],
+    ['A.Bath (E3)', 30.8, 31.3, 4.5, 8.3, '4\'6"×8\'0"', 'bath'],
+    ['Lift', 0.5, 20.2, 5.4, 7.2, '5\'6"×7\'0"', 'core'],
+    ['Stair', 10.5, 20.2, 14.8, 7.2, '13\'6"×7\'0"', 'core'],
+    ['A.Bath (W1)', 0.5, 27.7, 5.8, 8.3, '5\'6"×8\'0"', 'bath'],
+    ['A.Bath (W2)', 0.5, 38, 5.8, 8.3, '5\'6"×8\'0"', 'bath'],
+    ['8-bed dorm (front W)', 6.8, 29.4, 11.4, 18, '12\'6"×18\'0"', 'dorm'],
+    ['8-bed dorm (front E)', 18.6, 29.4, 11.8, 18, '12\'0"×18\'0"', 'dorm']
+  ]},
+  { id: 'SF', name: 'Second', base: 21, h: 10, depth: 45.5, rooms: [
+    ['4-bed ladies dorm', 0.5, 0, 8.5, 10, '11\'6"×10\'0"', 'dorm'],
+    ['A.Bath (W)', 0.5, 10.5, 8.5, 4.5, '8\'0"×4\'6"', 'bath'],
+    ['4-bed ladies dorm 2', 12.5, 0, 8.2, 15, '149 sft', 'dorm'],
+    ['A.Bath (N)', 21, 0, 4, 13, '8\'0"×4\'6"', 'bath'],
+    ['Room 4', 25.5, 0, 10, 15, '10\'0"×14\'0"', 'room'],
+    ['Store', 0.5, 15.5, 4, 5, '4\'0"×7\'0"', 'service'],
+    ['A.Bath (E1)', 30.5, 15.5, 5, 7.5, '5\'0"×7\'6"', 'bath'],
+    ['A.Bath (E2)', 30.5, 24, 5, 7.5, '5\'0"×7\'6"', 'bath'],
+    ['Lift', 0.5, 20.5, 5.4, 7.2, '5\'6"×7\'0"', 'core'],
+    ['Stair', 10.5, 20.5, 14.8, 7.2, '14\'0"×7\'0"', 'core'],
+    ['A.Bath (SW)', 0.5, 28, 7.5, 4.5, '7\'6"×4\'6"', 'bath'],
+    ['A.Bath (S)', 17, 28, 8, 4.5, '8\'0"×4\'6"', 'bath'],
+    ['Room 1', 0.5, 33, 11, 12, '11\'0"×12\'0"', 'room'],
+    ['Room 2', 12, 33, 13, 12, '13\'0"×12\'0"', 'room'],
+    ['Room 3', 25.5, 32.5, 10, 13, '10\'0"×13\'6"', 'room']
+  ], balcony: [[0.5, 11], [12, 13], [25.5, 10]] },
+  { id: 'TF', name: 'Third', base: 31, h: 10, depth: 46.4, rooms: [
+    ['Dining', 0.5, 0, 35, 19.5, '35\'0"×20\'0"', 'dine'],
+    ['Lift', 0.5, 20, 5.5, 8, '5\'6"×7\'0"', 'core'],
+    ['Stair', 10.5, 20, 15, 8, '14\'0"×7\'0"', 'core'],
+    ['Toilet (M)', 30.7, 20, 4.7, 3.5, '4\'9"×3\'6"', 'bath'],
+    ['Toilet (F)', 30.7, 24.5, 4.7, 3.5, '4\'9"×3\'6"', 'bath'],
+    ['Indoor games area', 0.5, 28.5, 35, 17.8, '35\'0"×18\'6"', 'open']
+  ]}
+];
+var KIND = { dorm: 0xC9B79C, bath: 0x9DB4BC, core: 0x7C7C82, room: 0xD8CBB4, dine: 0xE2D2B0, service: 0xAFA9A0, open: 0xBFC7B8 };
+var cv = document.getElementById('c'), stage = document.getElementById('stage');
+var R = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+var S = new THREE.Scene();
+var cam = new THREE.PerspectiveCamera(38, 1, 1, 700);
+var ctl = new THREE.OrbitControls(cam, cv);
+ctl.enableDamping = true; ctl.minDistance = 25; ctl.maxDistance = 240; ctl.maxPolarAngle = Math.PI / 2 - 0.02;
+var hemi = new THREE.HemisphereLight(0xffffff, 0x888078, 1);
+var sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(60, 90, 80);
+S.add(hemi, sun);
+
+function cssc(n) { return new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#dcd9d2'); }
+function std(c, o) { o = o || {}; o.color = c; o.roughness = o.roughness == null ? 0.85 : o.roughness; return new THREE.MeshStandardMaterial(o); }
+function bx(x, y, z, w, h, d, m) {
+  var o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  o.position.set(x + w / 2, y + h / 2, z + d / 2); return o;
+}
+var mWall = std(0xD9D6CE, { transparent: true, opacity: 0.92 });
+var mTimber = std(0xA0703F, { transparent: true, opacity: 1 });
+var mSlab = std(0x34353A);
+var mFrame = std(0x24252A);
+var mGlass = std(0x9CC0DE, { transparent: true, opacity: 0.38, roughness: 0.1, metalness: 0.2 });
+var mWin = std(0x20242B, { emissive: 0xFFB561, emissiveIntensity: 0.1 });
+var mLED = new THREE.MeshBasicMaterial({ color: 0xFFB35C });
+var mPlant = std(0x3F7A45), mCar = std(0x8C9097, { roughness: 0.4, metalness: 0.4 }), mPad = std(0x55565A), mRoad = std(0x2B2C30);
+var shellMats = [[mWall, 0.92], [mGlass, 0.38], [mTimber, 1]];
+
+function textTex(txt, w, h, font, color, bg) {
+  var c = document.createElement('canvas'); c.width = w; c.height = h; var g = c.getContext('2d');
+  if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); }
+  g.fillStyle = color; g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2);
+  var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+function label(txt) {
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTex(txt, 320, 64, '600 30px sans-serif', '#111', 'rgba(255,255,255,.88)'), depthTest: false, transparent: true }));
+  sp.scale.set(10, 2, 1); sp.renderOrder = 10; return sp;
+}
+function sign(txt, w, h, face) {
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: textTex(txt, 512, 128, '600 74px Georgia,serif', '#F4EFE6', '#26272B'), transparent: true }));
+  return m;
+}
+
+var root = new THREE.Group(); S.add(root);
+var ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), std(0xC9C5BB)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; root.add(ground);
+root.add(bx(-150, -0.08, 64, 340, 0.06, 14, mRoad));
+
+var groups = [], rooms = [], leds = [], winMats = [mWin];
+
+function buildFloor(f, fi) {
+  var g = new THREE.Group(); g.userData = { fi: fi, labels: [] };
+  var y0 = f.base, hh = f.h, dep = f.depth;
+  g.add(bx(0, y0, 0, W, 0.6, dep, mSlab));
+  f.rooms.forEach(function (r) {
+    var kind = r[6], col = KIND[kind];
+    var wh = { open: 0.15, dine: 0.3, core: 0.9 }[kind] || 0.78;
+    var tile = bx(r[1], y0 + 0.6, r[2], r[3], 0.12, r[4], std(col));
+    var vm = std(col, { transparent: true, opacity: kind === 'open' ? 0.08 : 0.2, depthWrite: false });
+    var vol = bx(r[1], y0 + 0.6, r[2], r[3], (hh - 0.8) * wh, r[4], vm);
+    var ed = new THREE.LineSegments(new THREE.EdgesGeometry(vol.geometry), new THREE.LineBasicMaterial({ color: 0x4A4A50, transparent: true, opacity: 0.55 }));
+    ed.position.copy(vol.position);
+    vol.userData = { name: r[0], size: r[5], fi: fi, mat: vm, tile: tile };
+    g.add(tile, vol, ed); rooms.push(vol);
+    var lb = label(r[0] + '  ' + r[5]); lb.scale.set(Math.min(14, Math.max(8, r[3] * 1.2)), 2, 1);
+    lb.position.set(r[1] + r[3] / 2, y0 + 3.2, r[2] + r[4] / 2); lb.visible = false; g.add(lb); g.userData.labels.push(lb);
+  });
+  var top = y0 + 0.6, sh = hh - 0.6;
+  if (f.id === 'GF') {
+    g.add(bx(0, top, 0, 14, sh, 0.4, mWall));
+    g.add(bx(0, top, 0, 0.4, sh, dep, mWall));
+    g.add(bx(W - 0.4, top, 20, 0.4, sh, dep - 20, mWall));
+    g.add(bx(0, top, 20, W, sh, 0.4, mWall)); // line between rear parking and the restaurant block
+  } else {
+    g.add(bx(0, top, 0, W, sh, 0.4, mWall));
+    g.add(bx(0, top, 0, 0.4, sh, dep, mWall));
+    g.add(bx(W - 0.4, top, 0, 0.4, sh, dep, mWall));
+  }
+  if (f.id === 'GF') {
+    g.add(bx(0, top, dep - 0.4, W, sh, 0.4, mTimber));
+    [[2, 3], [8.2, 3.6], [13.6, 3.6], [19.4, 3.6], [26, 3.6]].forEach(function (a, k) {
+      var win = bx(a[0] + 0.5, top + 0.9, dep + 0.02, a[1], 6.6, 0.12, k === 0 ? mFrame : mWin); g.add(win);
+    });
+    var gs = sign('DAZZTEL', 8, 2, 1); gs.position.set(4.5, top + 8.3, dep + 0.2); g.add(gs);
+    var led = bx(0.5, top + 8, dep + 0.05, 34, 0.15, 0.12, mLED); leds.push(led); g.add(led);
+    // outside the building line: DG room, sitout, two car bays, planters
+    g.add(bx(0, 0, 46.5, 8.5, 8, 9, mWall));
+    g.add(bx(8.5, 0, 46.5, 9.5, 0.3, 4, mSlab));
+    g.add(bx(18, 0, 46.5, 10, 0.08, 11, mPad), bx(28, 0, 46.5, 10, 0.08, 11, mPad));
+    [[19.5, 48.5], [29.5, 48.5]].forEach(function (p) { g.add(bx(p[0], 0.5, p[1], 7, 1.4, 3.4, mCar), bx(p[0] + 1.5, 1.9, p[1] + 0.3, 4, 1.1, 2.8, mCar)); });
+    [2, 9, 21, 33].forEach(function (x) { var s = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), mPlant); s.position.set(x, 1.3, dep + 1.4); g.add(s); });
+  } else if (f.id === 'TF') {
+    g.add(bx(0.4, top, dep - 0.2, W - 0.8, sh, 0.15, mGlass));
+    for (var k = 0; k <= 7; k++) g.add(bx(0.4 + k * 5, top, dep - 0.3, 0.3, sh, 0.35, mFrame));
+    var sg = sign('DAZZTEL', 9, 2.25, 1); sg.rotation.y = Math.PI / 2; sg.position.set(W + 0.15, y0 + 14, 22); g.userData.sideSign = sg;
+  } else {
+    g.add(bx(0, top, dep - 0.4, W, sh, 0.4, mWall));
+    [4.5, 14, 24, 31].forEach(function (x) { g.add(bx(x, top + 3, dep + 0.02, 2.6, 4.5, 0.12, mWin)); });
+    var n = 28;
+    for (var i = 0; i < n; i++) {
+      var fr = 0.3 + 0.7 * Math.pow(i / (n - 1), 0.9);
+      g.add(bx(0.4 + i * 1.25, y0 + 0.3, dep + (f.id === 'SF' ? 4.4 : 0.4), 0.55, (hh + 0.4) * fr, 0.55, mTimber));
+    }
+  }
+  if (f.balcony) {
+    f.balcony.forEach(function (b) {
+      g.add(bx(b[0], y0, 45.5, b[1], 0.5, 4, mSlab), bx(b[0], y0 + 0.5, 49.3, b[1], 3, 0.1, mGlass));
+      var s = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), mPlant); s.position.set(b[0] + b[1] / 2, y0 + 1.5, 48.3); g.add(s);
+    });
+  }
+  groups.push(g); root.add(g);
+}
+FLOORS.forEach(buildFloor);
+var side = groups[3].userData.sideSign; groups[3].add(side);
+
+var roof = new THREE.Group();
+roof.add(bx(-0.5, 41, -0.5, W + 1, 0.8, D + 1.6, mSlab));
+var rl = bx(-0.5, 40.9, D + 1.0, W + 1, 0.18, 0.18, mLED); leds.push(rl); roof.add(rl);
+var rr = bx(-0.5, 40.9, -0.5, 0.18, 0.18, D + 1.6, mLED); leds.push(rr); roof.add(rr);
+root.add(roof);
+var state = { floor: -1, explode: 0, explodeTo: 0, dusk: true, cut: 0, selected: null, roof: true };
+var $ = function (id) { return document.getElementById(id); };
+var tagEl = $('tag'), listEl = $('rooms');
+var CAMS = {
+  front: [[18, 22, 112], [18, 20, 24]],
+  corner: [[78, 40, 92], [18, 20, 24]],
+  top: [[18, 160, 24.5], [18, 0, 24]],
+  side: [[120, 24, 24], [18, 20, 24]]
+};
+var goP = null, goT = null;
+function go(k) { var c = CAMS[k]; goP = new THREE.Vector3().fromArray(c[0]); goT = new THREE.Vector3().fromArray(c[1]); }
+cam.position.set(78, 40, 92); ctl.target.set(18, 20, 24);
+ctl.addEventListener('start', function () { goP = goT = null; });
+
+function mood() {
+  var bg = cssc('--scene'), gr = cssc('--ground');
+  var dark = new THREE.Color(0x141a2b);
+  var b = state.dusk ? bg.clone().lerp(dark, 0.55) : bg.clone();
+  S.background = b; S.fog = new THREE.Fog(b, 220, 520);
+  ground.material.color.copy(gr).lerp(b, state.dusk ? 0.3 : 0);
+  hemi.intensity = state.dusk ? 0.55 : 1.05; sun.intensity = state.dusk ? 0.45 : 0.95;
+  mWin.emissiveIntensity = state.dusk ? 1.15 : 0.08;
+  mLED.color.set(state.dusk ? 0xFFB35C : 0xC9A777);
+}
+
+function setFloor(i) {
+  state.floor = i;
+  groups.forEach(function (g, k) {
+    g.visible = i < 0 || k === i;
+    g.userData.labels.forEach(function (l) { l.visible = (k === i); });
+  });
+  roof.visible = state.roof && i < 0;
+  clearSel();
+  Array.prototype.forEach.call($('floors').children, function (b, k) { b.setAttribute('aria-pressed', String(k - 1 === i)); });
+  buildList(); go(i < 0 ? 'corner' : 'top');
+  if (i >= 0) { state.explodeTo = 0; $('bExplode').setAttribute('aria-pressed', 'false'); }
+}
+function clearSel() {
+  if (state.selected) { state.selected.userData.mat.emissive.setHex(0); state.selected.userData.mat.opacity = 0.2; }
+  state.selected = null; tagEl.style.display = 'none';
+}
+function select(v) {
+  clearSel(); state.selected = v;
+  v.userData.mat.emissive.set(cssc('--accent')); v.userData.mat.emissiveIntensity = 0.7; v.userData.mat.opacity = 0.55;
+  tagEl.textContent = v.userData.name + ' · ' + v.userData.size; tagEl.style.display = 'block';
+}
+function buildList() {
+  listEl.innerHTML = '';
+  var i = state.floor;
+  $('rt').textContent = i < 0 ? 'Floors' : FLOORS[i].name + ' floor rooms';
+  if (i < 0) {
+    var uses = ['Restaurant, kitchen, reception, rear parking', '14 dorm beds ×2, 6-bed dorm, baths', 'Four rooms, two ladies dorms, balconies', 'Dining and indoor games area'];
+    FLOORS.forEach(function (f, k) {
+      var li = document.createElement('li'); li.innerHTML = '<span>' + f.name + '</span><span>' + f.rooms.length + ' spaces</span>';
+      li.title = uses[k]; li.onclick = function () { setFloor(k); }; listEl.appendChild(li);
+    });
+    return;
+  }
+  rooms.filter(function (r) { return r.userData.fi === i; }).forEach(function (r) {
+    var li = document.createElement('li'); li.innerHTML = '<span>' + r.userData.name + '</span><span>' + r.userData.size + '</span>';
+    li.onclick = function () { select(r); }; listEl.appendChild(li);
+  });
+}
+
+// floor buttons
+var fb = $('floors');
+['All'].concat(FLOORS.map(function (f) { return f.id; })).forEach(function (t, k) {
+  var b = document.createElement('button'); b.textContent = t; b.setAttribute('aria-pressed', String(k === 0));
+  b.onclick = function () { setFloor(k - 1); }; fb.appendChild(b);
+});
+function toggle(id, fn) { var b = $(id); b.onclick = function () { var v = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(v)); fn(v); }; }
+toggle('bExplode', function (v) { state.explodeTo = v ? 1 : 0; if (v && state.floor >= 0) setFloor(-1), $('bExplode').setAttribute('aria-pressed', 'true'), state.explodeTo = 1; });
+toggle('bRoof', function (v) { state.roof = v; roof.visible = v && state.floor < 0; });
+toggle('bDusk', function (v) { state.dusk = v; mood(); });
+toggle('bSpin', function (v) { ctl.autoRotate = v; ctl.autoRotateSpeed = 1.2; });
+Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.onclick = function () { go(b.getAttribute('data-cam')); }; });
+$('cut').oninput = function (e) {
+  state.cut = e.target.value / 100; $('cutv').textContent = state.cut ? Math.round(state.cut * 100) + '%' : 'off';
+  shellMats.forEach(function (p) { p[0].opacity = p[1] * (1 - 0.94 * state.cut); p[0].depthWrite = state.cut < 0.5; });
+};
+
+// hover and click on rooms
+var ray = new THREE.Raycaster(), mp = new THREE.Vector2();
+function pick(e) {
+  if (state.floor < 0) return null;
+  var r = cv.getBoundingClientRect(); mp.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mp, cam);
+  var hit = ray.intersectObjects(rooms.filter(function (v) { return v.userData.fi === state.floor; }), false)[0];
+  return hit ? hit.object : null;
+}
+var down = null;
+cv.addEventListener('pointerdown', function (e) { down = [e.clientX, e.clientY]; });
+cv.addEventListener('pointerup', function (e) {
+  if (!down || Math.abs(e.clientX - down[0]) + Math.abs(e.clientY - down[1]) > 6) return;
+  var v = pick(e); if (v) select(v); else clearSel();
+});
+
+function resize() {
+  var w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+  R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage); resize();
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', mood);
+
+var frame = 0, reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop() {
+  requestAnimationFrame(loop); frame++;
+  if (frame % 40 === 0) mood();
+  state.explode += (state.explodeTo - state.explode) * (reduce ? 1 : 0.08);
+  groups.forEach(function (g, k) { g.position.y = k * state.explode * 9; });
+  roof.position.y = 4 * state.explode * 9;
+  if (goP) {
+    var k = reduce ? 1 : 0.08; cam.position.lerp(goP, k); ctl.target.lerp(goT, k);
+    if (cam.position.distanceTo(goP) < 0.3) goP = goT = null;
+  }
+  ctl.update(); R.render(S, cam);
+}
+mood(); setFloor(-1); loop();
+})();</script>
+
+</body></html>
