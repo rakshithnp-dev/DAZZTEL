@@ -149,7 +149,6 @@ const CAFE_MENU: CafeItem[] = [
 
 interface HeroSlide {
   id: string;
-  tag: string;
   headline: string;
   subhead: string;
   image: string;
@@ -158,30 +157,26 @@ interface HeroSlide {
 const HERO_SLIDES: HeroSlide[] = [
   {
     id: 'slide-1',
-    tag: 'Sanctuary 01 • Sakrepatna, Karnataka',
     headline: 'Sleep Soundly. Ride Boundless.',
     subhead: 'India’s engineered boutique hostel network for touring motorcyclists and remote digital nomads.',
     image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1600&q=80',
   },
   {
     id: 'slide-2',
-    tag: 'Moto Infrastructure • Ground Floor Bays',
-    headline: 'Covered Bays & Dedicated Workshop.',
-    subhead: 'Concrete motorcycle bays with paddock stands, torque tools, chain maintenance station, and 24/7 CCTV surveillance.',
+    headline: 'Covered Bays. Dedicated Workshop.',
+    subhead: 'Hydraulic lifts, paddock stands, torque tools, chain maintenance station, and 24/7 CCTV surveillance.',
     image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1600&q=80',
   },
   {
     id: 'slide-3',
-    tag: 'Engineered Recovery • -32dB Acoustic Shell',
     headline: 'Acoustic Silence. Heated Gear Vaults.',
-    subhead: 'Private soundproof sleeping capsules with 45°C drying vaults designed specifically for damp helmets, boots, and riding armor.',
+    subhead: 'Private soundproof sleeping pods with 45°C drying vaults designed for helmets, boots, and riding armor.',
     image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1600&q=80',
   },
   {
     id: 'slide-4',
-    tag: 'Western Ghats Loop • Chikkamagaluru Ridges',
-    headline: 'Coffee Estates & High Mountain Passes.',
-    subhead: 'Curated GPX route loops directly from the sanctuary to Mullayanagiri Peak, Bababudangiri twists, and Bhadra Ghats.',
+    headline: 'Western Ghats. Mountain Loops.',
+    subhead: 'Curated GPX route loops to Mullayanagiri Peak, Bababudangiri twists, and Bhadra Ghats.',
     image: 'https://images.unsplash.com/photo-1508974239320-0a029497e820?auto=format&fit=crop&w=1600&q=80',
   },
 ];
@@ -525,13 +520,10 @@ THIS IS AN IMMUTABLE ELECTRONIC TAX INVOICE UNDER RULE 48(4) OF CGST.
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, oklch(10% 0.01 60 / 0.15) 0%, oklch(10% 0.01 60 / 0.86) 100%)' }} />
 
                   <div className="hero-content-wrap">
-                    <span className="tag-badge tag-badge--amber" style={{ marginBottom: 'var(--space-xs)', display: 'inline-block', backdropFilter: 'blur(6px)' }}>
-                      {slide.tag}
-                    </span>
-                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-display)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 var(--space-xs) 0', color: '#fff', wordBreak: 'break-word' }}>
+                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.75rem, 3.2vw + 0.25rem, 2.625rem)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.025em', margin: '0 0 var(--space-xs) 0', color: '#fff', wordBreak: 'break-word' }}>
                       {slide.headline}
                     </h1>
-                    <p style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-lead)', color: 'oklch(95% 0.01 80)', margin: 0, lineHeight: 1.4 }}>
+                    <p style={{ fontFamily: 'var(--font-body)', fontSize: 'clamp(0.9375rem, 0.4vw + 0.8rem, 1.0625rem)', color: 'oklch(95% 0.01 80)', margin: 0, lineHeight: 1.45, maxWidth: '560px' }}>
                       {slide.subhead}
                     </p>
                   </div>

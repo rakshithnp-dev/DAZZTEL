@@ -426,11 +426,10 @@ button:disabled {
   position: relative;
   border-radius: var(--radius-card);
   overflow: hidden;
-  min-height: 440px;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: var(--space-2xl) var(--space-xl);
   margin-bottom: var(--space-2xl);
   color: var(--color-white);
   box-sizing: border-box;
@@ -439,7 +438,6 @@ button:disabled {
 @media (max-width: 48rem) {
   .hero-box {
     min-height: 360px;
-    padding: var(--space-lg) var(--space-md);
     margin-bottom: var(--space-lg);
   }
 }
@@ -465,47 +463,53 @@ button:disabled {
 
 .hero-content-wrap {
   position: absolute;
-  bottom: var(--space-2xl);
-  left: var(--space-xl);
-  right: var(--space-xl);
-  max-width: 720px;
+  bottom: calc(var(--space-3xl) + 20px);
+  left: var(--space-2xl);
+  right: var(--space-2xl);
+  max-width: 580px;
   z-index: 2;
 }
 
 @media (max-width: 48rem) {
   .hero-content-wrap {
-    bottom: calc(var(--space-xl) + 28px);
-    left: var(--space-md);
-    right: var(--space-md);
+    bottom: calc(var(--space-2xl) + 28px);
+    left: var(--space-lg);
+    right: var(--space-lg);
+    max-width: 100%;
   }
 }
 
 .hero-carousel-nav {
   position: absolute;
-  bottom: var(--space-xl);
+  top: var(--space-lg);
   right: var(--space-xl);
   z-index: 5;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 @media (max-width: 48rem) {
   .hero-carousel-nav {
-    bottom: var(--space-md);
+    top: var(--space-md);
     right: var(--space-md);
-    gap: var(--space-xs);
+    padding: 4px 10px;
+    gap: var(--space-2xs);
   }
 }
 
 .hero-arrow-btn {
-  width: 36px;
-  height: 36px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -513,24 +517,24 @@ button:disabled {
   cursor: pointer;
   transition: all var(--dur-short) var(--ease-out);
   padding: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
 }
 
 .hero-arrow-btn:hover {
-  background: rgba(0, 0, 0, 0.7);
-  border-color: rgba(255, 255, 255, 0.7);
-  transform: scale(1.06);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: scale(1.08);
 }
 
 .hero-dots-wrap {
   display: flex;
   align-items: center;
-  gap: var(--space-2xs);
+  gap: var(--space-3xs);
 }
 
 .hero-dot {
-  height: 6px;
+  height: 5px;
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.35);
   border: none;
@@ -541,11 +545,11 @@ button:disabled {
 
 .hero-dot--active {
   background: #fff;
-  width: 24px;
+  width: 18px;
 }
 
 .hero-dot--inactive {
-  width: 8px;
+  width: 6px;
 }
 
 .hero-dot:hover {
